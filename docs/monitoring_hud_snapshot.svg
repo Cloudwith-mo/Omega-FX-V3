@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="360">
+  <rect width="100%" height="100%" fill="#f7f7f2" stroke="#333" stroke-width="2"/>
+  <text x="24" y="36" font-family="Courier New, monospace" font-size="20" fill="#111">FTMO Bot v3 - Runtime HUD (sample)</text>
+  <text x="24" y="70" font-family="Courier New, monospace" font-size="14" fill="#111">Run ID: ftmo-v1-20250101T120000Z-abcdef12</text>
+  <text x="24" y="100" font-family="Courier New, monospace" font-size="14" fill="#111">Stage: challenge | Timezone: Europe/Prague</text>
+  <text x="24" y="130" font-family="Courier New, monospace" font-size="14" fill="#111">Equity: 99,200 | Balance: 99,500 | Day Start Equity: 100,000</text>
+  <text x="24" y="160" font-family="Courier New, monospace" font-size="14" fill="#111">Daily Headroom: 4,200 | Max Headroom: 9,200</text>
+  <text x="24" y="190" font-family="Courier New, monospace" font-size="14" fill="#111">Buffers: daily 1,000 | max 2,000</text>
+  <text x="24" y="220" font-family="Courier New, monospace" font-size="14" fill="#111">Trading Days: 3 | Min Remaining: 1</text>
+  <text x="24" y="250" font-family="Courier New, monospace" font-size="14" fill="#111">Days Since Last Trade: 1 | Drawdown: 0.8% | Drawdown Days: 0</text>
+  <text x="24" y="280" font-family="Courier New, monospace" font-size="14" fill="#111">Open Positions: 1 | Target Progress: 0.32</text>
+  <text x="24" y="320" font-family="Courier New, monospace" font-size="12" fill="#666">Note: generated snapshot for reporting; no live UI yet.</text>
+</svg>

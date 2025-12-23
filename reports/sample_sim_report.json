@@ -1,0 +1,70 @@
+{
+  "generated_at_utc": "2025-12-23T22:26:27.023943Z",
+  "config_path": "configs/ftmo_v1.yaml",
+  "summary": {
+    "passed": false,
+    "failure_reason": "Profit target not reached",
+    "trading_days": 4,
+    "target_progress": 0.65,
+    "violations": [],
+    "min_daily_headroom": 3500.0,
+    "min_max_headroom": 10000.0,
+    "buffer_breaches": 0
+  },
+  "equity_curve": [
+    {
+      "time": "2024-06-01T09:00:00+02:00",
+      "equity": 100000.0
+    },
+    {
+      "time": "2024-06-01T10:00:00+02:00",
+      "equity": 102000.0
+    },
+    {
+      "time": "2024-06-02T10:00:00+02:00",
+      "equity": 100500.0
+    },
+    {
+      "time": "2024-06-03T10:00:00+02:00",
+      "equity": 103500.0
+    },
+    {
+      "time": "2024-06-04T10:00:00+02:00",
+      "equity": 106500.0
+    }
+  ],
+  "trades": [
+    {
+      "symbol": "EURUSD",
+      "entry_time": "2024-06-01 09:00:00+02:00",
+      "exit_time": "2024-06-01 10:00:00+02:00",
+      "entry_price": 1.1,
+      "exit_price": 1.12,
+      "profit": 2000
+    },
+    {
+      "symbol": "EURUSD",
+      "entry_time": "2024-06-02 09:00:00+02:00",
+      "exit_time": "2024-06-02 10:00:00+02:00",
+      "entry_price": 1.12,
+      "exit_price": 1.1,
+      "profit": -1500
+    },
+    {
+      "symbol": "EURUSD",
+      "entry_time": "2024-06-03 09:00:00+02:00",
+      "exit_time": "2024-06-03 10:00:00+02:00",
+      "entry_price": 1.1,
+      "exit_price": 1.13,
+      "profit": 3000
+    },
+    {
+      "symbol": "EURUSD",
+      "entry_time": "2024-06-04 09:00:00+02:00",
+      "exit_time": "2024-06-04 10:00:00+02:00",
+      "entry_price": 1.13,
+      "exit_price": 1.15,
+      "profit": 3000
+    }
+  ]
+}

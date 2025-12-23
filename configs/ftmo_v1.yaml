@@ -1,0 +1,39 @@
+name: ftmo_v1
+version: "1.0"
+run_id_prefix: ftmo-v1
+instruments:
+  - EURUSD
+  - GBPUSD
+rule_spec:
+  account_size: 100000
+  max_daily_loss: 5000
+  max_total_loss: 10000
+  challenge_profit_target: 10000
+  verification_profit_target: 5000
+  min_trading_days: 4
+  timezone: Europe/Prague
+  daily_loss_stop_pct: 0.8
+  max_loss_stop_pct: 0.8
+  midnight_policy: buffer
+  midnight_window_minutes: 30
+  midnight_buffer_multiplier: 2.0
+  max_days_without_trade: 25
+  drawdown_limit_pct: 0.07
+  drawdown_days_limit: 30
+  stage: challenge
+  funded_mode: standard
+strategy:
+  name: mean_reversion_v1
+  parameters:
+    max_spread: 2.0
+    max_open_trades: 3
+execution:
+  broker: paper
+  throttle:
+    max_requests_per_day: 1500
+    max_modifications_per_minute: 30
+monitoring:
+  audit_log_path: runtime/audit.log
+gate:
+  min_pass_rate: 0.7
+  max_buffer_breach_runs: 0

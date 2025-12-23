@@ -1,0 +1,18 @@
+{
+  "now": "2024-06-01 23:50:00+02:00",
+  "equity": 96500,
+  "balance": 96500,
+  "day_start_equity": 100000,
+  "day_start_time": "2024-06-01 00:00:00+02:00",
+  "initial_balance": 100000,
+  "floating_pnl": 0.0,
+  "commission": 0.0,
+  "swap": 0.0,
+  "other_fees": 0.0,
+  "trades": [],
+  "is_news_blackout": false,
+  "open_positions": 0,
+  "last_trade_time": null,
+  "stage_start_time": null,
+  "drawdown_start_time": null
+}
