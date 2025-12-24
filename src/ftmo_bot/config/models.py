@@ -44,6 +44,7 @@ class RuntimeConfig:
     safe_mode_path: str = "runtime/safe_mode.json"
     daily_bundle_dir: str = "reports/daily_bundles"
     daily_bundle_enabled: bool = True
+    daily_metrics_path: str = "runtime/daily_metrics.json"
     safe_mode_latched: bool = True
 
 

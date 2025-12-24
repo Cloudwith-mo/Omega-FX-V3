@@ -186,6 +186,7 @@ def _parse_runtime(data: dict[str, Any]) -> RuntimeConfig:
         safe_mode_path=str(data.get("safe_mode_path", "runtime/safe_mode.json")),
         daily_bundle_dir=str(data.get("daily_bundle_dir", "reports/daily_bundles")),
         daily_bundle_enabled=bool(data.get("daily_bundle_enabled", True)),
+        daily_metrics_path=str(data.get("daily_metrics_path", "runtime/daily_metrics.json")),
         safe_mode_latched=bool(data.get("safe_mode_latched", True)),
     )
 

@@ -20,6 +20,7 @@ from ftmo_bot.rule_engine import RuleEngine
 from ftmo_bot.rule_engine.time import trading_day_for
 from ftmo_bot.runtime import AsyncServiceConfig, AsyncServiceLoop, create_run_context
 from ftmo_bot.runtime.bundles import generate_daily_bundle
+from ftmo_bot.runtime.metrics import update_daily_metrics
 from ftmo_bot.runtime.safe_mode import SafeModeController
 from ftmo_bot.runtime.state_store import load_rule_state
 from ftmo_bot.runtime.status_store import write_runtime_status
@@ -148,6 +149,7 @@ def main() -> None:
     status_path = Path(config.runtime.status_path)
     state_snapshot_path = Path(config.runtime.state_snapshot_path)
     daily_bundle_dir = Path(config.runtime.daily_bundle_dir)
+    daily_metrics_path = Path(config.runtime.daily_metrics_path)
     last_status_time = 0.0
     last_state_mtime: float | None = None
 
@@ -170,6 +172,7 @@ def main() -> None:
                 state.update_drawdown_start(config.rule_spec.drawdown_limit_pct)
                 status = build_runtime_status(state, governor)
                 write_runtime_status(status_path, status)
+                update_daily_metrics(daily_metrics_path, state, status, config.rule_spec.timezone)
                 governor.check_inactivity(state)
 
         if not config.runtime.daily_bundle_enabled:
@@ -191,6 +194,7 @@ def main() -> None:
                 status_path=status_path,
                 run_state_path=run_state_path,
                 safe_mode_path=Path(config.runtime.safe_mode_path),
+                daily_metrics_path=daily_metrics_path if daily_metrics_path.exists() else None,
                 journal_path=journal_path if journal_path.exists() else None,
                 state_snapshot_path=state_snapshot_path if state_snapshot_path.exists() else None,
                 bundle_day=bundle_day,

@@ -85,6 +85,7 @@ runtime:
   safe_mode_path: runtime/safe_mode.json
   daily_bundle_dir: reports/daily_bundles
   daily_bundle_enabled: true
+  daily_metrics_path: runtime/daily_metrics.json
   safe_mode_latched: true
 gate:
   min_pass_rate: 0.7

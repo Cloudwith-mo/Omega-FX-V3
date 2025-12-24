@@ -41,6 +41,9 @@ Run service loop with MT5 (requires MetaTrader5)
 Generate a daily bundle (manual)
 - python scripts/generate_daily_bundle.py --config configs/ftmo_v1.yaml --output-dir reports/daily_bundles
 
+Analyze the last N bundles
+- python scripts/analyze_bundles.py --bundle-root reports/daily_bundles --last 5 --output-dir reports/bundle_summary
+
 Run Streamlit HUD (reads runtime/status.json by default)
 - python -m pip install -e .[hud]
 - streamlit run apps/hud_streamlit.py
