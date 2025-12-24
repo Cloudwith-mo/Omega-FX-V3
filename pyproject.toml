@@ -7,6 +7,7 @@ dependencies = ["PyYAML>=6.0"]
 
 [project.optional-dependencies]
 dev = ["pytest"]
+hud = ["streamlit>=1.30"]
 
 [build-system]
 requires = ["setuptools>=67"]

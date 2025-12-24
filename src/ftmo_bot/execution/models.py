@@ -8,6 +8,20 @@ from typing import Optional
 
 
 @dataclass(frozen=True)
+class SymbolSpec:
+    symbol: str
+    pip_size: float
+    pip_value_usd_per_lot: float
+    min_lot: float
+    lot_step: float
+    max_lot: float
+    tick_size: Optional[float] = None
+    tick_value: Optional[float] = None
+    digits: Optional[int] = None
+    contract_size: Optional[float] = None
+
+
+@dataclass(frozen=True)
 class ExecutionOrder:
     client_order_id: str
     symbol: str

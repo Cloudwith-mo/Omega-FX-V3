@@ -33,6 +33,21 @@ class GateConfig:
 
 
 @dataclass(frozen=True)
+class RuntimeConfig:
+    fast_loop_interval_seconds: float = 0.5
+    bar_loop_interval_seconds: float = 60.0
+    reconcile_interval_seconds: int = 30
+    health_check_interval_seconds: int = 10
+    status_interval_seconds: float = 5.0
+    status_path: str = "runtime/status.json"
+    state_snapshot_path: str = "runtime/state_snapshot.json"
+    safe_mode_path: str = "runtime/safe_mode.json"
+    daily_bundle_dir: str = "reports/daily_bundles"
+    daily_bundle_enabled: bool = True
+    safe_mode_latched: bool = True
+
+
+@dataclass(frozen=True)
 class BotConfig:
     name: str
     version: str
@@ -43,3 +58,4 @@ class BotConfig:
     execution: ExecutionConfig
     monitoring: MonitoringConfig
     gate: GateConfig = GateConfig()
+    runtime: RuntimeConfig = RuntimeConfig()

@@ -19,3 +19,9 @@ class Monitor:
 
     def disconnect(self, reason: str) -> None:
         self.notifier.notify("DISCONNECT", reason)
+
+    def inactivity_warning(self, message: str) -> None:
+        self.notifier.notify("INACTIVITY", message)
+
+    def safe_mode(self, reason: str) -> None:
+        self.notifier.notify("SAFE_MODE", reason)

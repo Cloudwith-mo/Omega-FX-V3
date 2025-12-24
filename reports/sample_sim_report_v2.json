@@ -1,0 +1,85 @@
+{
+  "generated_at_utc": "2025-12-23T23:28:25.696762+00:00",
+  "config_path": "configs/ftmo_v1.yaml",
+  "summary": {
+    "passed": false,
+    "failure_reason": "Profit target not reached",
+    "trading_days": 3,
+    "target_progress": -0.0017497600000002422,
+    "violations": [],
+    "min_daily_headroom": 4993.000799999994,
+    "min_max_headroom": 9982.502399999998,
+    "buffer_breaches": 0,
+    "min_equity_intraday": 99982.5024,
+    "min_equity_overall": 99982.5024
+  },
+  "breach_events": [],
+  "equity_curve": [
+    {
+      "time": "2024-06-01T09:00:00+02:00",
+      "equity": 100000.0
+    },
+    {
+      "time": "2024-06-01T09:00:00+02:00",
+      "equity": 99996.4988
+    },
+    {
+      "time": "2024-06-01T10:00:00+02:00",
+      "equity": 99993.0008
+    },
+    {
+      "time": "2024-06-02T10:00:00+02:00",
+      "equity": 99989.4996
+    },
+    {
+      "time": "2024-06-03T10:00:00+02:00",
+      "equity": 99986.0036
+    },
+    {
+      "time": "2024-06-04T10:00:00+02:00",
+      "equity": 99982.5024
+    }
+  ],
+  "signals": [
+    {
+      "time": "2024-06-01 09:00:00+02:00",
+      "action": "open",
+      "side": "buy",
+      "size": 1.0,
+      "price": null,
+      "symbol": "EURUSD"
+    },
+    {
+      "time": "2024-06-01 10:00:00+02:00",
+      "action": "close",
+      "side": "buy",
+      "size": 1.0,
+      "price": null,
+      "symbol": "EURUSD"
+    },
+    {
+      "time": "2024-06-02 10:00:00+02:00",
+      "action": "open",
+      "side": "buy",
+      "size": 1.0,
+      "price": null,
+      "symbol": "EURUSD"
+    },
+    {
+      "time": "2024-06-03 10:00:00+02:00",
+      "action": "close",
+      "side": "buy",
+      "size": 1.0,
+      "price": null,
+      "symbol": "EURUSD"
+    },
+    {
+      "time": "2024-06-04 10:00:00+02:00",
+      "action": "open",
+      "side": "buy",
+      "size": 1.0,
+      "price": null,
+      "symbol": "EURUSD"
+    }
+  ]
+}

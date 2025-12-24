@@ -3,7 +3,7 @@
 from ftmo_bot.execution.broker import BrokerAdapter
 from ftmo_bot.execution.engine import ExecutionEngine
 from ftmo_bot.execution.journal import OrderJournal
-from ftmo_bot.execution.models import BrokerOrder, ExecutionOrder, Position
+from ftmo_bot.execution.models import BrokerOrder, ExecutionOrder, Position, SymbolSpec
 from ftmo_bot.execution.mt5 import MT5Broker
 from ftmo_bot.execution.paper import PaperBroker
 from ftmo_bot.execution.throttle import RequestThrottle, ThrottleDecision
@@ -18,5 +18,6 @@ __all__ = [
     "PaperBroker",
     "Position",
     "RequestThrottle",
+    "SymbolSpec",
     "ThrottleDecision",
 ]

@@ -12,6 +12,9 @@ class PriceBar:
     time: datetime
     bid: float
     ask: float
+    symbol: str = "SIM"
+    high: Optional[float] = None
+    low: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,7 @@ class Signal:
     side: str  # "buy" or "sell"
     size: float
     price: Optional[float] = None
+    symbol: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -41,6 +45,15 @@ class EquityPoint:
 
 
 @dataclass(frozen=True)
+class BreachEvent:
+    time: datetime
+    reason: str
+    equity: float
+    daily_headroom: float
+    max_headroom: float
+
+
+@dataclass(frozen=True)
 class MonteCarloConfig:
     slippage_range: Sequence[float] = (0.0, 0.0)
     spread_range: Sequence[float] = (0.0, 0.0)
@@ -57,3 +70,6 @@ class SimulationResult:
     min_daily_headroom: float
     min_max_headroom: float
     buffer_breaches: int
+    min_equity_intraday: float
+    min_equity_overall: float
+    breach_events: list[BreachEvent]

@@ -3,7 +3,9 @@
 from ftmo_bot.rule_engine.engine import RuleEngine
 from ftmo_bot.rule_engine.models import (
     AccountStage,
+    FeeSchedule,
     FundedMode,
+    MtMMode,
     MidnightPolicy,
     NewsPolicy,
     OrderIntent,
@@ -15,7 +17,9 @@ from ftmo_bot.rule_engine.models import (
 
 __all__ = [
     "AccountStage",
+    "FeeSchedule",
     "FundedMode",
+    "MtMMode",
     "MidnightPolicy",
     "NewsPolicy",
     "OrderIntent",

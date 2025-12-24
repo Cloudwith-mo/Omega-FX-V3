@@ -11,8 +11,15 @@ from typing import Any, Optional
 
 import yaml
 
-from ftmo_bot.config.models import BotConfig, ExecutionConfig, GateConfig, MonitoringConfig, StrategyConfig
-from ftmo_bot.rule_engine.models import AccountStage, FundedMode, MidnightPolicy, RuleSpec
+from ftmo_bot.config.models import (
+    BotConfig,
+    ExecutionConfig,
+    GateConfig,
+    MonitoringConfig,
+    RuntimeConfig,
+    StrategyConfig,
+)
+from ftmo_bot.rule_engine.models import AccountStage, FeeSchedule, FundedMode, MidnightPolicy, MtMMode, RuleSpec
 
 
 def load_config(path: str | Path) -> BotConfig:
@@ -29,6 +36,7 @@ def load_config(path: str | Path) -> BotConfig:
     execution = _parse_execution(_require(data, "execution"))
     monitoring = _parse_monitoring(data.get("monitoring", {}))
     gate = _parse_gate(data.get("gate", {}))
+    runtime = _parse_runtime(data.get("runtime", {}))
 
     return BotConfig(
         name=name,
@@ -40,6 +48,7 @@ def load_config(path: str | Path) -> BotConfig:
         execution=execution,
         monitoring=monitoring,
         gate=gate,
+        runtime=runtime,
     )
 
 
@@ -102,6 +111,13 @@ def _parse_rule_spec(data: dict[str, Any]) -> RuleSpec:
             return None
         return float(value)
 
+    fees = {}
+    for symbol, payload in data.get("fees", {}).items():
+        fees[symbol] = FeeSchedule(
+            commission_usd_per_lot_round_trip=float(payload.get("commission_usd_per_lot_round_trip", 0.0)),
+            swap_usd_per_lot_per_day=float(payload.get("swap_usd_per_lot_per_day", 0.0)),
+        )
+
     return RuleSpec(
         account_size=float(_require(data, "account_size")),
         max_daily_loss=float(_require(data, "max_daily_loss")),
@@ -114,12 +130,16 @@ def _parse_rule_spec(data: dict[str, Any]) -> RuleSpec:
         max_loss_buffer=float(data.get("max_loss_buffer", 0.0)),
         daily_loss_stop_pct=optional_float(data.get("daily_loss_stop_pct")),
         max_loss_stop_pct=optional_float(data.get("max_loss_stop_pct")),
+        mtm_mode=parse_enum(MtMMode, data.get("mtm_mode", "worst_ohlc"), "mtm_mode"),
+        fees=fees,
         midnight_policy=parse_enum(MidnightPolicy, data.get("midnight_policy", "none"), "midnight_policy"),
         midnight_window_minutes=int(data.get("midnight_window_minutes", 30)),
         midnight_buffer_multiplier=float(data.get("midnight_buffer_multiplier", 1.0)),
         max_days_without_trade=int(data.get("max_days_without_trade", 25)),
+        inactivity_warning_days=int(data.get("inactivity_warning_days", 5)),
         drawdown_limit_pct=float(data.get("drawdown_limit_pct", 0.07)),
         drawdown_days_limit=int(data.get("drawdown_days_limit", 30)),
+        drawdown_warning_days=int(data.get("drawdown_warning_days", 5)),
         stage=parse_enum(AccountStage, data.get("stage", "challenge"), "stage"),
         funded_mode=parse_enum(FundedMode, data.get("funded_mode", "standard"), "funded_mode"),
         strategy_is_legit=bool(data.get("strategy_is_legit", True)),
@@ -154,9 +174,26 @@ def _parse_gate(data: dict[str, Any]) -> GateConfig:
     )
 
 
+def _parse_runtime(data: dict[str, Any]) -> RuntimeConfig:
+    return RuntimeConfig(
+        fast_loop_interval_seconds=float(data.get("fast_loop_interval_seconds", 0.5)),
+        bar_loop_interval_seconds=float(data.get("bar_loop_interval_seconds", 60.0)),
+        reconcile_interval_seconds=int(data.get("reconcile_interval_seconds", 30)),
+        health_check_interval_seconds=int(data.get("health_check_interval_seconds", 10)),
+        status_interval_seconds=float(data.get("status_interval_seconds", 5.0)),
+        status_path=str(data.get("status_path", "runtime/status.json")),
+        state_snapshot_path=str(data.get("state_snapshot_path", "runtime/state_snapshot.json")),
+        safe_mode_path=str(data.get("safe_mode_path", "runtime/safe_mode.json")),
+        daily_bundle_dir=str(data.get("daily_bundle_dir", "reports/daily_bundles")),
+        daily_bundle_enabled=bool(data.get("daily_bundle_enabled", True)),
+        safe_mode_latched=bool(data.get("safe_mode_latched", True)),
+    )
+
+
 def serialize_config(config: BotConfig) -> dict[str, Any]:
     payload = asdict(config)
     payload["rule_spec"]["stage"] = config.rule_spec.stage.value
     payload["rule_spec"]["funded_mode"] = config.rule_spec.funded_mode.value
     payload["rule_spec"]["midnight_policy"] = config.rule_spec.midnight_policy.value
+    payload["rule_spec"]["mtm_mode"] = config.rule_spec.mtm_mode.value
     return payload

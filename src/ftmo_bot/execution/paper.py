@@ -5,15 +5,16 @@ from __future__ import annotations
 from dataclasses import replace
 
 from ftmo_bot.execution.broker import BrokerAdapter
-from ftmo_bot.execution.models import BrokerOrder, ExecutionOrder, Position
+from ftmo_bot.execution.models import BrokerOrder, ExecutionOrder, Position, SymbolSpec
 
 
 class PaperBroker(BrokerAdapter):
-    def __init__(self, fill_on_place: bool = True) -> None:
+    def __init__(self, fill_on_place: bool = True, symbol_specs: dict[str, SymbolSpec] | None = None) -> None:
         self.fill_on_place = fill_on_place
         self._orders: dict[str, BrokerOrder] = {}
         self._positions: dict[str, Position] = {}
         self._counter = 0
+        self._symbol_specs = symbol_specs or {}
 
     def place_order(self, order: ExecutionOrder) -> BrokerOrder:
         existing = self._orders.get(order.client_order_id)
@@ -73,3 +74,6 @@ class PaperBroker(BrokerAdapter):
 
     def list_positions(self):
         return list(self._positions.values())
+
+    def get_symbol_spec(self, symbol: str) -> SymbolSpec | None:
+        return self._symbol_specs.get(symbol)

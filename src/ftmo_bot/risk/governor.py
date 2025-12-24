@@ -73,6 +73,11 @@ class RiskGovernor:
             return
         self._monitor.flatten_trigger(reason)
 
+    def _notify_inactivity(self, message: str) -> None:
+        if self._monitor is None:
+            return
+        self._monitor.inactivity_warning(message)
+
     def _effective_buffers(self, state: RuleState) -> tuple[float, float, bool]:
         in_window = in_midnight_window(
             state.now,
@@ -158,6 +163,28 @@ class RiskGovernor:
         decision = RiskDecision(True, "Healthy")
         self._log("state_check", {"allow": decision.allow, "reason": decision.reason})
         return decision
+
+    def check_inactivity(self, state: RuleState) -> list[str]:
+        warnings: list[str] = []
+        days_since = state.days_since_last_trade(self.spec.timezone)
+        if days_since is not None:
+            warn_after = max(0, self.spec.max_days_without_trade - self.spec.inactivity_warning_days)
+            if days_since >= warn_after:
+                message = f"Inactivity warning: {days_since} days since last trade"
+                warnings.append(message)
+                self._notify_inactivity(message)
+                self._log("inactivity_warning", {"kind": "no_trade", "days": days_since})
+
+        drawdown_days = state.drawdown_days(self.spec.timezone)
+        if drawdown_days is not None:
+            warn_after = max(0, self.spec.drawdown_days_limit - self.spec.drawdown_warning_days)
+            if drawdown_days >= warn_after:
+                message = f"Drawdown duration warning: {drawdown_days} days"
+                warnings.append(message)
+                self._notify_inactivity(message)
+                self._log("inactivity_warning", {"kind": "drawdown", "days": drawdown_days})
+
+        return warnings
 
     def pre_trade(self, order_intent: OrderIntent, state: RuleState) -> RiskDecision:
         state_check = self.evaluate_state(state)

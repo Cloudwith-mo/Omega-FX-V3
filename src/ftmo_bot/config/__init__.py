@@ -7,13 +7,21 @@ from ftmo_bot.config.loader import (
     serialize_config,
     verify_config_lock,
 )
-from ftmo_bot.config.models import BotConfig, ExecutionConfig, GateConfig, MonitoringConfig, StrategyConfig
+from ftmo_bot.config.models import (
+    BotConfig,
+    ExecutionConfig,
+    GateConfig,
+    MonitoringConfig,
+    RuntimeConfig,
+    StrategyConfig,
+)
 
 __all__ = [
     "BotConfig",
     "ExecutionConfig",
     "GateConfig",
     "MonitoringConfig",
+    "RuntimeConfig",
     "StrategyConfig",
     "compute_config_hash",
     "freeze_config",

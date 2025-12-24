@@ -28,11 +28,22 @@ class NewsPolicy(str, Enum):
     APPLY = "apply"
 
 
+class MtMMode(str, Enum):
+    WORST_OHLC = "worst_ohlc"
+    CLOSE = "close"
+
+
 class MidnightPolicy(str, Enum):
     NONE = "none"
     BUFFER = "buffer"
     REDUCE = "reduce"
     FLATTEN = "flatten"
+
+
+@dataclass(frozen=True)
+class FeeSchedule:
+    commission_usd_per_lot_round_trip: float = 0.0
+    swap_usd_per_lot_per_day: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -48,12 +59,16 @@ class RuleSpec:
     max_loss_buffer: float = 0.0
     daily_loss_stop_pct: Optional[float] = 0.8
     max_loss_stop_pct: Optional[float] = 0.8
+    mtm_mode: MtMMode = MtMMode.WORST_OHLC
+    fees: dict[str, FeeSchedule] = field(default_factory=dict)
     midnight_policy: MidnightPolicy = MidnightPolicy.NONE
     midnight_window_minutes: int = 30
     midnight_buffer_multiplier: float = 1.0
     max_days_without_trade: int = 25
+    inactivity_warning_days: int = 5
     drawdown_limit_pct: float = 0.07
     drawdown_days_limit: int = 30
+    drawdown_warning_days: int = 5
     stage: AccountStage = AccountStage.CHALLENGE
     funded_mode: FundedMode = FundedMode.STANDARD
     strategy_is_legit: bool = True
@@ -88,6 +103,9 @@ class RuleSpec:
         multiplier = max(1.0, self.midnight_buffer_multiplier)
         return self.effective_daily_buffer() * multiplier, self.effective_max_buffer() * multiplier
 
+    def fee_schedule(self, symbol: str) -> FeeSchedule:
+        return self.fees.get(symbol, FeeSchedule())
+
 
 @dataclass(frozen=True)
 class OrderIntent:
@@ -97,6 +115,9 @@ class OrderIntent:
     time: datetime
     estimated_risk: float
     reduce_only: bool = False
+    stop_price: Optional[float] = None
+    take_profit: Optional[float] = None
+    strategy_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
