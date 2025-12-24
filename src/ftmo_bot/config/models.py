@@ -19,6 +19,8 @@ class ExecutionConfig:
     broker: str
     account: Optional[str] = None
     throttle: dict[str, Any] = field(default_factory=dict)
+    duplicate_window_seconds: float = 10.0
+    duplicate_block: bool = True
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,8 @@ class RuntimeConfig:
     daily_bundle_enabled: bool = True
     daily_metrics_path: str = "runtime/daily_metrics.json"
     safe_mode_latched: bool = True
+    drift_state_path: str = "runtime/drift_state.json"
+    drift_unresolved_seconds: float = 60.0
 
 
 @dataclass(frozen=True)

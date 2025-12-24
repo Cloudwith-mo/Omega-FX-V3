@@ -56,6 +56,7 @@ def generate_daily_bundle(
     run_state_path: Path,
     safe_mode_path: Path,
     daily_metrics_path: Path | None = None,
+    drift_state_path: Path | None = None,
     journal_path: Path | None = None,
     state_snapshot_path: Path | None = None,
     bundle_day: date | None = None,
@@ -85,6 +86,8 @@ def generate_daily_bundle(
     copy_if_exists(state_snapshot_path, "state_snapshot.json")
     if journal_path:
         copy_if_exists(journal_path, "journal.db")
+    if drift_state_path:
+        copy_if_exists(drift_state_path, "drift_state.json")
     if daily_metrics_path:
         copy_if_exists(daily_metrics_path, "daily_metrics.json")
         if daily_metrics_path.exists():

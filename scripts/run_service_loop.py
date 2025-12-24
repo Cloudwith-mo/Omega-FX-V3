@@ -18,7 +18,7 @@ from ftmo_bot.strategy import fetch_symbol_specs
 from ftmo_bot.risk import RiskGovernor
 from ftmo_bot.rule_engine import RuleEngine
 from ftmo_bot.rule_engine.time import trading_day_for
-from ftmo_bot.runtime import AsyncServiceConfig, AsyncServiceLoop, create_run_context
+from ftmo_bot.runtime import AsyncServiceConfig, AsyncServiceLoop, DriftTracker, create_run_context
 from ftmo_bot.runtime.bundles import generate_daily_bundle
 from ftmo_bot.runtime.metrics import update_daily_metrics
 from ftmo_bot.runtime.safe_mode import SafeModeController
@@ -134,7 +134,15 @@ def main() -> None:
     journal = OrderJournal(journal_path)
 
     broker = _build_broker(config.execution.broker, config.execution.account)
-    engine = ExecutionEngine(broker, journal, throttle=throttle, audit_log=audit, monitor=monitor)
+    engine = ExecutionEngine(
+        broker,
+        journal,
+        throttle=throttle,
+        audit_log=audit,
+        monitor=monitor,
+        duplicate_window_seconds=config.execution.duplicate_window_seconds,
+        duplicate_block=config.execution.duplicate_block,
+    )
 
     rule_engine = RuleEngine(config.rule_spec)
     governor = RiskGovernor(rule_engine, audit_log=audit, monitor=monitor)
@@ -150,8 +158,10 @@ def main() -> None:
     state_snapshot_path = Path(config.runtime.state_snapshot_path)
     daily_bundle_dir = Path(config.runtime.daily_bundle_dir)
     daily_metrics_path = Path(config.runtime.daily_metrics_path)
+    drift_state_path = Path(config.runtime.drift_state_path)
     last_status_time = 0.0
     last_state_mtime: float | None = None
+    last_connection_ok: bool | None = None
 
     tz = ZoneInfo(config.rule_spec.timezone)
 
@@ -195,6 +205,7 @@ def main() -> None:
                 run_state_path=run_state_path,
                 safe_mode_path=Path(config.runtime.safe_mode_path),
                 daily_metrics_path=daily_metrics_path if daily_metrics_path.exists() else None,
+                drift_state_path=drift_state_path if drift_state_path.exists() else None,
                 journal_path=journal_path if journal_path.exists() else None,
                 state_snapshot_path=state_snapshot_path if state_snapshot_path.exists() else None,
                 bundle_day=bundle_day,
@@ -208,6 +219,25 @@ def main() -> None:
         if safe_mode.state.enabled:
             return
 
+    drift_tracker = DriftTracker(
+        drift_state_path,
+        max_age_seconds=config.runtime.drift_unresolved_seconds,
+        audit_log=audit,
+        safe_mode=safe_mode,
+    )
+
+    async def on_reconcile(report) -> None:
+        drift_tracker.update(report)
+
+    async def on_health(ok: bool) -> None:
+        nonlocal last_connection_ok
+        if last_connection_ok is None:
+            last_connection_ok = ok
+            return
+        if ok and not last_connection_ok:
+            audit.log("reconnect", {"reason": "Broker connection restored"})
+        last_connection_ok = ok
+
     service = AsyncServiceLoop(
         engine,
         config=AsyncServiceConfig(
@@ -217,6 +247,8 @@ def main() -> None:
             health_check_interval_seconds=config.runtime.health_check_interval_seconds,
         ),
         safe_mode=safe_mode,
+        on_reconcile=on_reconcile,
+        on_health=on_health,
         audit_log=audit,
     )
 

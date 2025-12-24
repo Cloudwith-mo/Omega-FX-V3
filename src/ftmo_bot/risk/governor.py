@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
+from zoneinfo import ZoneInfo
 from typing import Optional
 
 from ftmo_bot.rule_engine.engine import RuleEngine
 from ftmo_bot.rule_engine.models import MidnightPolicy, OrderIntent, RuleState
-from ftmo_bot.rule_engine.time import in_midnight_window
+from ftmo_bot.rule_engine.time import in_midnight_window, trading_day_for
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,7 @@ class RiskGovernor:
         self.spec = engine.spec
         self._disabled = False
         self._disable_reason: Optional[str] = None
+        self._daily_buffer_stop_day: Optional[date] = None
         self._audit_log = audit_log
         self._monitor = monitor
 
@@ -94,6 +97,9 @@ class RiskGovernor:
     def evaluate_state(self, state: RuleState) -> RiskDecision:
         state.roll_day_if_needed(self.spec.timezone)
         state.update_drawdown_start(self.spec.drawdown_limit_pct)
+        current_day = trading_day_for(state.now, self.spec.timezone)
+        if self._daily_buffer_stop_day and self._daily_buffer_stop_day != current_day:
+            self._daily_buffer_stop_day = None
 
         if self._disabled:
             reason = self._disable_reason or "Trading disabled"
@@ -108,7 +114,24 @@ class RiskGovernor:
             self.disable(reason)
             decision = RiskDecision(False, reason, flatten=True)
             self._notify_flatten(reason)
+            self._log(
+                "rule_violation",
+                {"code": violations[0].code, "message": violations[0].message},
+            )
             self._log("state_check", {"allow": decision.allow, "reason": decision.reason, "flatten": decision.flatten})
+            return decision
+
+        if self._daily_buffer_stop_day == current_day:
+            decision = RiskDecision(False, "Daily loss buffer reached", flatten=False, reduce_only=True)
+            self._log(
+                "state_check",
+                {
+                    "allow": decision.allow,
+                    "reason": decision.reason,
+                    "flatten": decision.flatten,
+                    "reduce_only": decision.reduce_only,
+                },
+            )
             return decision
 
         headroom = self.rule_headroom(state)
@@ -117,6 +140,7 @@ class RiskGovernor:
             self.disable(reason)
             decision = RiskDecision(False, reason, flatten=True)
             self._notify_flatten(reason)
+            self._log("rule_violation", {"code": "hard_limit", "message": reason})
             self._log("state_check", {"allow": decision.allow, "reason": decision.reason, "flatten": decision.flatten})
             return decision
 
@@ -143,11 +167,30 @@ class RiskGovernor:
             return decision
 
         if headroom["daily"] <= daily_buffer:
+            if self._daily_buffer_stop_day is None:
+                self._daily_buffer_stop_day = current_day
+                local_time = state.now.astimezone(ZoneInfo(self.spec.timezone))
+                self._log(
+                    "daily_buffer_stop",
+                    {
+                        "timestamp_utc": state.now.isoformat(),
+                        "timestamp_local": local_time.isoformat(),
+                        "equity": state.effective_equity(),
+                        "daily_headroom": headroom["daily"],
+                        "open_positions": state.open_positions,
+                        "action": "reduce_only",
+                    },
+                )
             self._notify_buffer("daily", headroom["daily"])
-            decision = RiskDecision(False, "Daily loss buffer reached", flatten=False)
+            decision = RiskDecision(False, "Daily loss buffer reached", flatten=False, reduce_only=True)
             self._log(
                 "state_check",
-                {"allow": decision.allow, "reason": decision.reason, "flatten": decision.flatten},
+                {
+                    "allow": decision.allow,
+                    "reason": decision.reason,
+                    "flatten": decision.flatten,
+                    "reduce_only": decision.reduce_only,
+                },
             )
             return decision
 

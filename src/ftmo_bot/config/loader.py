@@ -158,6 +158,8 @@ def _parse_execution(data: dict[str, Any]) -> ExecutionConfig:
         broker=str(_require(data, "broker")),
         account=data.get("account"),
         throttle=dict(data.get("throttle", {})),
+        duplicate_window_seconds=float(data.get("duplicate_window_seconds", 10.0)),
+        duplicate_block=bool(data.get("duplicate_block", True)),
     )
 
 
@@ -188,6 +190,8 @@ def _parse_runtime(data: dict[str, Any]) -> RuntimeConfig:
         daily_bundle_enabled=bool(data.get("daily_bundle_enabled", True)),
         daily_metrics_path=str(data.get("daily_metrics_path", "runtime/daily_metrics.json")),
         safe_mode_latched=bool(data.get("safe_mode_latched", True)),
+        drift_state_path=str(data.get("drift_state_path", "runtime/drift_state.json")),
+        drift_unresolved_seconds=float(data.get("drift_unresolved_seconds", 60.0)),
     )
 
 

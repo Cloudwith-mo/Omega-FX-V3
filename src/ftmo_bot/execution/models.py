@@ -22,6 +22,14 @@ class SymbolSpec:
 
 
 @dataclass(frozen=True)
+class ReconcileReport:
+    missing_in_broker: list[str]
+    missing_in_journal: list[str]
+    reconciled_closed: list[str]
+    reconciled_added: list[str]
+
+
+@dataclass(frozen=True)
 class ExecutionOrder:
     client_order_id: str
     symbol: str
@@ -29,6 +37,8 @@ class ExecutionOrder:
     volume: float
     time: datetime
     price: Optional[float] = None
+    intent_id: Optional[str] = None
+    strategy_id: Optional[str] = None
 
 
 @dataclass(frozen=True)

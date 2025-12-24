@@ -61,6 +61,8 @@ def main() -> None:
         status_path=Path(config.runtime.status_path),
         run_state_path=run_state_path,
         safe_mode_path=Path(config.runtime.safe_mode_path),
+        daily_metrics_path=Path(config.runtime.daily_metrics_path),
+        drift_state_path=Path(config.runtime.drift_state_path),
         journal_path=journal_path,
         state_snapshot_path=Path(config.runtime.state_snapshot_path),
         bundle_day=bundle_day,

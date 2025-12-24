@@ -53,12 +53,17 @@ def update_daily_metrics(
     daily_headroom = status.headroom.daily
     max_headroom = status.headroom.maximum
     drawdown_pct = status.drawdown_pct
+    day_start_equity = status.day_start_equity
 
     min_equity = min(entry.get("min_equity", equity), equity)
     max_equity = max(entry.get("max_equity", equity), equity)
     min_daily_headroom = min(entry.get("min_daily_headroom", daily_headroom), daily_headroom)
     min_max_headroom = min(entry.get("min_max_headroom", max_headroom), max_headroom)
     max_drawdown_pct = max(entry.get("max_drawdown_pct", drawdown_pct), drawdown_pct)
+    intraday_drawdown_pct = 0.0
+    if day_start_equity > 0:
+        intraday_drawdown_pct = max(0.0, (day_start_equity - min_equity) / day_start_equity)
+    max_intraday_drawdown = max(entry.get("max_intraday_drawdown_pct", intraday_drawdown_pct), intraday_drawdown_pct)
 
     trades_total = len(state.trades)
     trades_today = _count_trades_for_day(state, date.fromisoformat(day), timezone)
@@ -70,6 +75,8 @@ def update_daily_metrics(
             "min_daily_headroom": min_daily_headroom,
             "min_max_headroom": min_max_headroom,
             "max_drawdown_pct": max_drawdown_pct,
+            "max_intraday_drawdown_pct": max_intraday_drawdown,
+            "day_start_equity": day_start_equity,
             "trades_total": trades_total,
             "trades_today": trades_today,
             "trading_days": state.trading_days(timezone),

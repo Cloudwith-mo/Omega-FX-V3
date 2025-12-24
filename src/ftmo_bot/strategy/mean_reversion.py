@@ -35,6 +35,7 @@ class MeanReversionParams:
     max_positions_total: int = 2
     max_positions_per_symbol: int = 1
     max_trades_per_day: int = 4
+    max_entries_per_15min: int = 2
     daily_loss_stop_pct: float = 0.01
 
     @staticmethod
@@ -62,6 +63,7 @@ class MeanReversionParams:
             max_positions_total=int(data.get("max_positions_total", 2)),
             max_positions_per_symbol=int(data.get("max_positions_per_symbol", 1)),
             max_trades_per_day=int(data.get("max_trades_per_day", 4)),
+            max_entries_per_15min=int(data.get("max_entries_per_15min", 2)),
             daily_loss_stop_pct=float(data.get("daily_loss_stop_pct", 0.01)),
         )
 
@@ -238,6 +240,8 @@ class MeanReversionStrategy:
             return decisions
         if self.state.trades_today(day) >= self.params.max_trades_per_day:
             return decisions
+        if self.state.entries_in_last_minutes(now, 15) >= self.params.max_entries_per_15min:
+            return decisions
 
         close_price = (bar.bid + bar.ask) / 2.0
         side = None
@@ -281,7 +285,7 @@ class MeanReversionStrategy:
             entry_index=entry_index,
         )
         self.state.positions.append(position)
-        self.state.record_trade(day)
+        self.state.record_trade(day, now)
 
         signal = Signal(time=now, action="open", side=side, size=size_result.lot_size, symbol=bar.symbol)
         intent = OrderIntent(

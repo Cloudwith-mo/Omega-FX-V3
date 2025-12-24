@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 from ftmo_bot.rule_engine.models import OrderIntent
@@ -56,6 +56,7 @@ class StrategyState:
     positions: list[PositionState] = field(default_factory=list)
     trades_by_day: dict[date, int] = field(default_factory=dict)
     realized_pnl_by_day: dict[date, float] = field(default_factory=dict)
+    entry_times: list[datetime] = field(default_factory=list)
 
     def trades_today(self, day: date) -> int:
         return self.trades_by_day.get(day, 0)
@@ -63,8 +64,19 @@ class StrategyState:
     def realized_pnl_today(self, day: date) -> float:
         return self.realized_pnl_by_day.get(day, 0.0)
 
-    def record_trade(self, day: date) -> None:
+    def record_trade(self, day: date, timestamp: datetime) -> None:
         self.trades_by_day[day] = self.trades_by_day.get(day, 0) + 1
+        self.entry_times.append(timestamp)
+
+    def entries_in_last_minutes(self, now: datetime, minutes: int) -> int:
+        if minutes <= 0:
+            return 0
+        cutoff = now - timedelta(minutes=minutes)
+        count = 0
+        for ts in self.entry_times:
+            if ts >= cutoff:
+                count += 1
+        return count
 
     def record_realized_pnl(self, day: date, pnl: float) -> None:
         self.realized_pnl_by_day[day] = self.realized_pnl_by_day.get(day, 0.0) + pnl

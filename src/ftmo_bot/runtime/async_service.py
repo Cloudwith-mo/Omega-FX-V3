@@ -8,10 +8,13 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable, Optional
 
 from ftmo_bot.execution.engine import ExecutionEngine
+from ftmo_bot.execution.models import ReconcileReport
 from ftmo_bot.runtime.safe_mode import SafeModeController
 
 
 Callback = Callable[[], Awaitable[None] | None]
+ReconcileCallback = Callable[[ReconcileReport], Awaitable[None] | None]
+HealthCallback = Callable[[bool], Awaitable[None] | None]
 
 
 @dataclass(frozen=True)
@@ -28,11 +31,15 @@ class AsyncServiceLoop:
         engine: ExecutionEngine,
         config: Optional[AsyncServiceConfig] = None,
         safe_mode: Optional[SafeModeController] = None,
+        on_reconcile: ReconcileCallback | None = None,
+        on_health: HealthCallback | None = None,
         audit_log: Optional[object] = None,
     ) -> None:
         self.engine = engine
         self.config = config or AsyncServiceConfig()
         self.safe_mode = safe_mode
+        self._on_reconcile = on_reconcile
+        self._on_health = on_health
         self._audit_log = audit_log
 
     async def _maybe_call(self, callback: Callback | None) -> None:
@@ -72,12 +79,20 @@ class AsyncServiceLoop:
                     pass
 
     async def _reconcile_once(self) -> None:
-        await asyncio.to_thread(self.engine.reconcile)
+        report = await asyncio.to_thread(self.engine.reconcile)
+        if self._on_reconcile is not None and report is not None:
+            result = self._on_reconcile(report)
+            if inspect.isawaitable(result):
+                await result
 
     async def _health_once(self) -> None:
         ok = await asyncio.to_thread(self.engine.check_connection)
         if not ok and self.safe_mode is not None:
             self.safe_mode.enable("Broker connection lost")
+        if self._on_health is not None:
+            result = self._on_health(ok)
+            if inspect.isawaitable(result):
+                await result
 
     async def run_forever(
         self,
