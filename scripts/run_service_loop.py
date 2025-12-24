@@ -17,12 +17,13 @@ from ftmo_bot.monitoring import AuditLog, LogNotifier, Monitor, build_runtime_st
 from ftmo_bot.strategy import fetch_symbol_specs
 from ftmo_bot.risk import RiskGovernor
 from ftmo_bot.rule_engine import RuleEngine
-from ftmo_bot.rule_engine.time import trading_day_for
+from ftmo_bot.rule_engine.models import RuleState
+from ftmo_bot.rule_engine.time import day_start_for, trading_day_for
 from ftmo_bot.runtime import AsyncServiceConfig, AsyncServiceLoop, DriftTracker, create_run_context
 from ftmo_bot.runtime.bundles import generate_daily_bundle
 from ftmo_bot.runtime.metrics import update_daily_metrics
 from ftmo_bot.runtime.safe_mode import SafeModeController
-from ftmo_bot.runtime.state_store import load_rule_state
+from ftmo_bot.runtime.state_store import load_rule_state, save_rule_state
 from ftmo_bot.runtime.status_store import write_runtime_status
 
 
@@ -37,10 +38,10 @@ def _save_run_state(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def _build_broker(broker: str, account: str | None) -> object:
+def _build_broker(broker: str, account: str | None, initial_balance: float) -> object:
     broker = broker.lower()
     if broker == "paper":
-        return PaperBroker(fill_on_place=True)
+        return PaperBroker(fill_on_place=True, initial_balance=initial_balance)
     if broker != "mt5":
         raise ValueError(f"Unsupported broker: {broker}")
 
@@ -133,7 +134,7 @@ def main() -> None:
     journal_path.parent.mkdir(parents=True, exist_ok=True)
     journal = OrderJournal(journal_path)
 
-    broker = _build_broker(config.execution.broker, config.execution.account)
+    broker = _build_broker(config.execution.broker, config.execution.account, config.rule_spec.account_size)
     engine = ExecutionEngine(
         broker,
         journal,
@@ -160,39 +161,90 @@ def main() -> None:
     daily_metrics_path = Path(config.runtime.daily_metrics_path)
     drift_state_path = Path(config.runtime.drift_state_path)
     last_status_time = 0.0
-    last_state_mtime: float | None = None
     last_connection_ok: bool | None = None
 
     tz = ZoneInfo(config.rule_spec.timezone)
+    state_cache = load_rule_state(state_snapshot_path) if state_snapshot_path.exists() else None
 
     async def fast_loop() -> None:
-        nonlocal last_status_time, last_state_mtime, last_bundle_day
+        nonlocal last_status_time, last_bundle_day, state_cache
         now_mono = time.monotonic()
         if now_mono - last_status_time < config.runtime.status_interval_seconds:
             return
         last_status_time = now_mono
 
-        state = None
-        if state_snapshot_path.exists():
-            mtime = state_snapshot_path.stat().st_mtime
-            if last_state_mtime is None or mtime != last_state_mtime:
-                last_state_mtime = mtime
-                state = load_rule_state(state_snapshot_path)
-                state.roll_day_if_needed(config.rule_spec.timezone)
-                state.update_drawdown_start(config.rule_spec.drawdown_limit_pct)
-                status = build_runtime_status(state, governor)
-                write_runtime_status(status_path, status)
-                update_daily_metrics(daily_metrics_path, state, status, config.rule_spec.timezone)
-                governor.check_inactivity(state)
+        now = datetime.now(tz).astimezone()
+        account = broker.get_account_snapshot()
+        if account is None:
+            audit.log("account_snapshot_missing", {"reason": "broker returned None"})
+            equity = state_cache.equity if state_cache else config.rule_spec.account_size
+            balance = state_cache.balance if state_cache else config.rule_spec.account_size
+        else:
+            equity = account.equity
+            balance = account.balance
+
+        positions = list(broker.list_positions())
+        open_orders = list(broker.list_open_orders())
+
+        if state_cache is None:
+            state_cache = RuleState(
+                now=now,
+                equity=equity,
+                balance=balance,
+                day_start_equity=equity,
+                day_start_time=day_start_for(now, config.rule_spec.timezone),
+                initial_balance=config.rule_spec.account_size,
+            )
+            state_cache.stage_start_time = now
+
+        state_cache.now = now
+        state_cache.equity = equity
+        state_cache.balance = balance
+        state_cache.floating_pnl = equity - balance
+        state_cache.open_positions = len(positions)
+        state_cache.roll_day_if_needed(config.rule_spec.timezone)
+        state_cache.update_drawdown_start(config.rule_spec.drawdown_limit_pct)
+
+        decision = governor.evaluate_state(state_cache)
+        status = build_runtime_status(state_cache, governor)
+        write_runtime_status(status_path, status)
+        update_daily_metrics(daily_metrics_path, state_cache, status, config.rule_spec.timezone)
+        governor.check_inactivity(state_cache)
+
+        local_time = state_cache.now.astimezone(tz)
+        extra = {
+            "timestamp_utc": state_cache.now.isoformat(),
+            "timestamp_local": local_time.isoformat(),
+            "open_orders": len(open_orders),
+            "open_positions": len(positions),
+            "headroom": {"daily": status.headroom.daily, "max": status.headroom.maximum},
+            "safe_mode": {
+                "enabled": safe_mode.state.enabled,
+                "reason": safe_mode.state.reason,
+                "since": safe_mode.state.since.isoformat() if safe_mode.state.since else None,
+            },
+            "last_decision": {
+                "allow": decision.allow,
+                "reason": decision.reason,
+                "flatten": decision.flatten,
+                "reduce_only": decision.reduce_only,
+            },
+        }
+        if account is not None:
+            extra["account"] = {
+                "equity": account.equity,
+                "balance": account.balance,
+                "margin": account.margin,
+                "free_margin": account.free_margin,
+                "currency": account.currency,
+            }
+
+        save_rule_state(state_snapshot_path, state_cache, extra=extra)
 
         if not config.runtime.daily_bundle_enabled:
             return
 
-        if state is None:
-            now = datetime.now(tz)
-            bundle_day = now.date()
-        else:
-            bundle_day = trading_day_for(state.now, config.rule_spec.timezone)
+        bundle_day = trading_day_for(state_cache.now, config.rule_spec.timezone)
 
         if last_bundle_day != bundle_day.isoformat():
             generate_daily_bundle(

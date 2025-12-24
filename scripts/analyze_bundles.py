@@ -131,6 +131,7 @@ class DaySummary:
     max_modifications_1m: int
     buffer_breaches: int
     hard_limit_breaches: int
+    stable_frequency: bool
 
 
 def main() -> None:
@@ -247,11 +248,15 @@ def main() -> None:
         max_entries_15m = _max_events_in_window(order_times, timedelta(minutes=15))
         max_modifications_1m = _max_events_in_window(modify_times, timedelta(minutes=1))
 
+        stable_frequency = True
         if max_trades_per_day is not None and trades > max_trades_per_day:
+            stable_frequency = False
             notes.append(f"{day}: trades exceeded max_trades_per_day ({trades} > {max_trades_per_day})")
         if max_entries_per_15m is not None and max_entries_15m > max_entries_per_15m:
+            stable_frequency = False
             notes.append(f"{day}: max entries/15m exceeded ({max_entries_15m} > {max_entries_per_15m})")
         if max_modifications_per_minute is not None and max_modifications_1m > max_modifications_per_minute:
+            stable_frequency = False
             notes.append(
                 f"{day}: modifications/min exceeded ({max_modifications_1m} > {max_modifications_per_minute})"
             )
@@ -277,6 +282,7 @@ def main() -> None:
                 max_modifications_1m=max_modifications_1m,
                 buffer_breaches=buffer_breaches,
                 hard_limit_breaches=hard_limit_breaches,
+                stable_frequency=stable_frequency,
             )
         )
 
@@ -306,12 +312,22 @@ def main() -> None:
     total_breaches = sum(day.breach_events for day in summaries)
     total_drift_unresolved = sum(day.unresolved_drift_events for day in summaries)
     total_duplicates = sum(day.duplicate_order_events for day in summaries)
+    stable_frequency_all = all(day.stable_frequency for day in summaries)
 
     pass_daily_buffer_policy = total_buffer_stops <= 1
-    pass_internal_buffers = total_breaches == 0
+    passes_policy_2 = (
+        total_breaches == 0
+        and total_drift_unresolved == 0
+        and total_duplicates == 0
+        and stable_frequency_all
+    )
+    go_no_go = "GO" if pass_daily_buffer_policy and passes_policy_2 else "NO_GO"
 
     summary = {
         "run_id": run_dir.name,
+        "passes_policy_1": pass_daily_buffer_policy,
+        "passes_policy_2": passes_policy_2,
+        "go_no_go": go_no_go,
         "days": [day.day for day in summaries],
         "totals": {
             "total_trades": total_trades,
@@ -329,8 +345,7 @@ def main() -> None:
             "restart_events": total_restarts,
             "reconnect_events": total_reconnects,
             "disconnect_events": total_disconnects,
-            "pass_daily_buffer_policy": pass_daily_buffer_policy,
-            "pass_internal_buffers": pass_internal_buffers,
+            "stable_frequency": stable_frequency_all,
         },
         "daily_buffer_stop_events": {
             day.day: day.daily_buffer_stops for day in summaries if day.daily_buffer_stops
@@ -346,7 +361,7 @@ def main() -> None:
     table_lines = [
         "day,trades,min_daily_headroom,min_max_headroom,max_intraday_drawdown_pct,max_overall_drawdown_pct,"
         "buffer_stops,breaches,drift_unresolved,duplicates,restarts,reconnects,disconnections,"
-        "max_entries_15m,max_modifications_1m",
+        "max_entries_15m,max_modifications_1m,stable_frequency",
     ]
     for day in summaries:
         table_lines.append(
@@ -354,7 +369,7 @@ def main() -> None:
             f"{day.max_intraday_drawdown_pct},{day.max_drawdown_pct},{len(day.daily_buffer_stops)},"
             f"{day.breach_events},{day.unresolved_drift_events},{day.duplicate_order_events},"
             f"{day.restart_events},{day.reconnect_events},{day.disconnect_events},"
-            f"{day.max_entries_15m},{day.max_modifications_1m}"
+            f"{day.max_entries_15m},{day.max_modifications_1m},{day.stable_frequency}"
         )
     table_path = output_dir / "summary_table.csv"
     table_path.write_text("\n".join(table_lines), encoding="utf-8")

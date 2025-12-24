@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Iterable, Optional
+from uuid import uuid4
 
 
 class AccountStage(str, Enum):
@@ -118,6 +119,7 @@ class OrderIntent:
     stop_price: Optional[float] = None
     take_profit: Optional[float] = None
     strategy_id: Optional[str] = None
+    intent_id: str = field(default_factory=lambda: uuid4().hex)
 
 
 @dataclass(frozen=True)

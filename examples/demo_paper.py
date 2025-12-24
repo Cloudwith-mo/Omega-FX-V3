@@ -74,6 +74,8 @@ order = ExecutionOrder(
     volume=1.0,
     time=datetime(2024, 6, 1, 12, 5, tzinfo=tz),
     price=1.1,
+    intent_id="demo-intent-001",
+    strategy_id="demo",
 )
 
 first = executor.place_order(order)

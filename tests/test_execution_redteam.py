@@ -74,6 +74,7 @@ def test_execution_idempotent_place_order(tmp_path):
         volume=1.0,
         time=datetime(2024, 6, 1, tzinfo=timezone.utc),
         price=1.1,
+        intent_id="intent-1",
     )
 
     first = engine.place_order(order)
@@ -96,6 +97,7 @@ def test_execution_reject_records_status(tmp_path):
         volume=1.0,
         time=datetime(2024, 6, 1, tzinfo=timezone.utc),
         price=1.1,
+        intent_id="intent-2",
     )
 
     engine.place_order(order)
@@ -116,6 +118,7 @@ def test_partial_fill_stays_open(tmp_path):
         volume=1.0,
         time=datetime(2024, 6, 1, tzinfo=timezone.utc),
         price=1.1,
+        intent_id="intent-3",
     )
 
     engine.place_order(order)
@@ -136,6 +139,7 @@ def test_request_throttle_blocks(tmp_path):
         volume=1.0,
         time=datetime(2024, 6, 1, tzinfo=timezone.utc),
         price=1.1,
+        intent_id="intent-4",
     )
 
     engine.place_order(order)
@@ -148,6 +152,7 @@ def test_request_throttle_blocks(tmp_path):
                 volume=1.0,
                 time=datetime(2024, 6, 1, 0, 1, tzinfo=timezone.utc),
                 price=1.1,
+                intent_id="intent-5",
             )
         )
         assert False, "Expected throttle to block"
@@ -164,3 +169,24 @@ def test_disconnect_monitor_called(tmp_path):
     ok = engine.check_connection()
     assert ok is False
     assert monitor.disconnects == ["Broker connection lost"]
+
+
+def test_order_requires_intent_id(tmp_path):
+    journal = OrderJournal(tmp_path / "journal.db")
+    broker = PaperBroker(fill_on_place=True)
+    engine = ExecutionEngine(broker, journal)
+
+    order = ExecutionOrder(
+        client_order_id="id-6",
+        symbol="EURUSD",
+        side="buy",
+        volume=1.0,
+        time=datetime(2024, 6, 1, tzinfo=timezone.utc),
+        price=1.1,
+    )
+
+    try:
+        engine.place_order(order)
+        assert False, "Expected intent_id enforcement"
+    except RuntimeError as exc:
+        assert "intent_id" in str(exc)

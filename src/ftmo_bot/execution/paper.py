@@ -5,16 +5,22 @@ from __future__ import annotations
 from dataclasses import replace
 
 from ftmo_bot.execution.broker import BrokerAdapter
-from ftmo_bot.execution.models import BrokerOrder, ExecutionOrder, Position, SymbolSpec
+from ftmo_bot.execution.models import AccountSnapshot, BrokerOrder, ExecutionOrder, Position, SymbolSpec
 
 
 class PaperBroker(BrokerAdapter):
-    def __init__(self, fill_on_place: bool = True, symbol_specs: dict[str, SymbolSpec] | None = None) -> None:
+    def __init__(
+        self,
+        fill_on_place: bool = True,
+        symbol_specs: dict[str, SymbolSpec] | None = None,
+        initial_balance: float = 0.0,
+    ) -> None:
         self.fill_on_place = fill_on_place
         self._orders: dict[str, BrokerOrder] = {}
         self._positions: dict[str, Position] = {}
         self._counter = 0
         self._symbol_specs = symbol_specs or {}
+        self._balance = float(initial_balance)
 
     def place_order(self, order: ExecutionOrder) -> BrokerOrder:
         existing = self._orders.get(order.client_order_id)
@@ -77,3 +83,12 @@ class PaperBroker(BrokerAdapter):
 
     def get_symbol_spec(self, symbol: str) -> SymbolSpec | None:
         return self._symbol_specs.get(symbol)
+
+    def get_account_snapshot(self) -> AccountSnapshot | None:
+        return AccountSnapshot(
+            equity=self._balance,
+            balance=self._balance,
+            margin=0.0,
+            free_margin=0.0,
+            currency="USD",
+        )

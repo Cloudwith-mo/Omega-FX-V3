@@ -100,6 +100,8 @@ class ExecutionEngine:
         return ok
 
     def place_order(self, order: ExecutionOrder) -> BrokerOrder:
+        if order.intent_id is None:
+            raise RuntimeError("intent_id is required for order placement")
         existing = self.journal.get(order.client_order_id)
         if existing and existing.broker_order_id:
             payload = existing.payload

@@ -1,0 +1,18 @@
+[Unit]
+Description=FTMO Bot v3 service loop
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ftmo-bot
+EnvironmentFile=/etc/ftmo-bot.env
+ExecStart=/usr/bin/env PYTHONPATH=src /usr/bin/python3 scripts/run_service_loop.py --config ${FTMO_CONFIG_PATH} --resume
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

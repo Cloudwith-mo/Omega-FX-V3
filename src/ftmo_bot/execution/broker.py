@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ftmo_bot.execution.models import BrokerOrder, ExecutionOrder, Position, SymbolSpec
+from ftmo_bot.execution.models import AccountSnapshot, BrokerOrder, ExecutionOrder, Position, SymbolSpec
 
 
 class BrokerAdapter:
@@ -24,6 +24,9 @@ class BrokerAdapter:
         raise NotImplementedError
 
     def get_symbol_spec(self, symbol: str) -> SymbolSpec | None:  # pragma: no cover - interface
+        return None
+
+    def get_account_snapshot(self) -> AccountSnapshot | None:  # pragma: no cover - interface
         return None
 
     def ping(self) -> bool:  # pragma: no cover - interface

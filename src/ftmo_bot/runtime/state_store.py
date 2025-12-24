@@ -62,7 +62,7 @@ def load_rule_state(path: str | Path) -> RuleState:
     )
 
 
-def save_rule_state(path: str | Path, state: RuleState) -> None:
+def save_rule_state(path: str | Path, state: RuleState, extra: Optional[dict] = None) -> None:
     payload = asdict(state)
     payload["now"] = _serialize_dt(state.now)
     payload["day_start_time"] = _serialize_dt(state.day_start_time)
@@ -80,6 +80,8 @@ def save_rule_state(path: str | Path, state: RuleState) -> None:
         }
         for trade in state.trades
     ]
+    if extra:
+        payload.update(extra)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Iterable
 
 from ftmo_bot.execution.broker import BrokerAdapter
-from ftmo_bot.execution.models import BrokerOrder, ExecutionOrder, Position, SymbolSpec
+from ftmo_bot.execution.models import AccountSnapshot, BrokerOrder, ExecutionOrder, Position, SymbolSpec
 
 try:  # pragma: no cover - optional dependency
     import MetaTrader5 as mt5
@@ -174,6 +174,18 @@ class MT5Broker(BrokerAdapter):
         if mt5 is None:
             return False
         return mt5.terminal_info() is not None
+
+    def get_account_snapshot(self) -> AccountSnapshot | None:
+        info = mt5.account_info()
+        if info is None:
+            return None
+        return AccountSnapshot(
+            equity=float(info.equity),
+            balance=float(info.balance),
+            margin=float(getattr(info, "margin", 0.0) or 0.0),
+            free_margin=float(getattr(info, "margin_free", 0.0) or 0.0),
+            currency=str(getattr(info, "currency", "")) or None,
+        )
 
     def get_symbol_spec(self, symbol: str) -> SymbolSpec | None:
         info = mt5.symbol_info(symbol)

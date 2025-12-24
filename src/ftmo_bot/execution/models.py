@@ -22,6 +22,15 @@ class SymbolSpec:
 
 
 @dataclass(frozen=True)
+class AccountSnapshot:
+    equity: float
+    balance: float
+    margin: Optional[float] = None
+    free_margin: Optional[float] = None
+    currency: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class ReconcileReport:
     missing_in_broker: list[str]
     missing_in_journal: list[str]
