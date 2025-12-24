@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 
 from ftmo_bot.config import compute_config_hash, freeze_config, load_config, verify_config_lock
 from ftmo_bot.execution import ExecutionEngine, MT5Broker, OrderJournal, PaperBroker, RequestThrottle
+from ftmo_bot.execution.broker import BrokerAdapter
+from ftmo_bot.execution.models import BrokerOrder, Position
 from dataclasses import asdict
 
 from ftmo_bot.monitoring import AuditLog, LogNotifier, Monitor, build_runtime_status
@@ -38,7 +40,52 @@ def _save_run_state(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def _build_broker(broker: str, account: str | None, initial_balance: float) -> object:
+class DisconnectToggleBroker(BrokerAdapter):
+    def __init__(self, inner: BrokerAdapter, toggle_path: Path, audit_log: AuditLog | None = None) -> None:
+        self.inner = inner
+        self.toggle_path = toggle_path
+        self._audit_log = audit_log
+        self._active = False
+
+    def _log(self, event: str, payload: dict) -> None:
+        if self._audit_log is None:
+            return
+        self._audit_log.log(event, payload)
+
+    def ping(self) -> bool:
+        if self.toggle_path.exists():
+            if not self._active:
+                self._active = True
+                self._log("disconnect_simulated", {"path": str(self.toggle_path)})
+            return False
+        if self._active:
+            self._active = False
+            self._log("disconnect_simulated_clear", {"path": str(self.toggle_path)})
+        return self.inner.ping()
+
+    def place_order(self, order):
+        return self.inner.place_order(order)
+
+    def cancel_order(self, broker_order_id: str) -> None:
+        return self.inner.cancel_order(broker_order_id)
+
+    def modify_order(self, broker_order_id: str, price: float | None = None) -> None:
+        return self.inner.modify_order(broker_order_id, price=price)
+
+    def list_open_orders(self):
+        return self.inner.list_open_orders()
+
+    def list_positions(self):
+        return self.inner.list_positions()
+
+    def get_symbol_spec(self, symbol: str):
+        return self.inner.get_symbol_spec(symbol)
+
+    def get_account_snapshot(self):
+        return self.inner.get_account_snapshot()
+
+
+def _build_broker(broker: str, account: str | None, initial_balance: float) -> BrokerAdapter:
     broker = broker.lower()
     if broker == "paper":
         return PaperBroker(fill_on_place=True, initial_balance=initial_balance)
@@ -75,6 +122,7 @@ def main() -> None:
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--clear-safe", action="store_true")
+    parser.add_argument("--simulate-disconnect-path", default=None)
     args = parser.parse_args()
 
     config_path = Path(args.config)
@@ -135,6 +183,9 @@ def main() -> None:
     journal = OrderJournal(journal_path)
 
     broker = _build_broker(config.execution.broker, config.execution.account, config.rule_spec.account_size)
+    simulate_path = args.simulate_disconnect_path or os.getenv("FTMO_FORCE_DISCONNECT")
+    if simulate_path:
+        broker = DisconnectToggleBroker(broker, Path(simulate_path), audit_log=audit)
     engine = ExecutionEngine(
         broker,
         journal,
@@ -212,12 +263,39 @@ def main() -> None:
         governor.check_inactivity(state_cache)
 
         local_time = state_cache.now.astimezone(tz)
+        day_start_local = state_cache.day_start_time.astimezone(tz)
+        day_start_utc = state_cache.day_start_time.astimezone(ZoneInfo("UTC"))
+
+        def serialize_order(order: BrokerOrder) -> dict:
+            return {
+                "client_order_id": order.client_order_id,
+                "broker_order_id": order.broker_order_id,
+                "status": order.status,
+                "symbol": order.symbol,
+                "side": order.side,
+                "volume": order.volume,
+                "price": order.price,
+                "time": order.time.isoformat(),
+            }
+
+        def serialize_position(pos: Position) -> dict:
+            return {
+                "symbol": pos.symbol,
+                "side": pos.side,
+                "volume": pos.volume,
+                "entry_price": pos.entry_price,
+                "unrealized_pnl": pos.unrealized_pnl,
+            }
         extra = {
             "timestamp_utc": state_cache.now.isoformat(),
             "timestamp_local": local_time.isoformat(),
             "open_orders": len(open_orders),
             "open_positions": len(positions),
+            "orders": [serialize_order(order) for order in open_orders],
+            "positions": [serialize_position(pos) for pos in positions],
             "headroom": {"daily": status.headroom.daily, "max": status.headroom.maximum},
+            "day_start_local": day_start_local.isoformat(),
+            "day_start_utc": day_start_utc.isoformat(),
             "safe_mode": {
                 "enabled": safe_mode.state.enabled,
                 "reason": safe_mode.state.reason,
