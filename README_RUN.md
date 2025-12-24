@@ -54,6 +54,49 @@ Analyze the last N bundles
 Daily gate review
 - scripts/gate_daily_check.sh
 
+Windows (PowerShell) gate run
+- scripts/gate_smoke.ps1 -Minutes 30
+- scripts/gate_5day.ps1
+- scripts/gate_daily_check.ps1
+- crash logs: runtime\service.log (marker: runtime\service_crash.txt)
+- disconnect toggle:
+  $env:FTMO_FORCE_DISCONNECT = "$env:TEMP\ftmo_force_disconnect"
+  New-Item -ItemType File -Path $env:FTMO_FORCE_DISCONNECT -Force
+  Remove-Item $env:FTMO_FORCE_DISCONNECT
+
+Windows (PowerShell) one-click
+- smoke: scripts\gate_oneclick.ps1 -Phase smoke -Minutes 30
+- 5-day start: scripts\gate_oneclick.ps1 -Phase gate
+- tail logs live: add `-TailLogs`
+- credentials: set `MT5_LOGIN`, `MT5_PASSWORD`, `MT5_SERVER` in your session or enter at the prompt
+
+Simply run (Windows PowerShell, copy/paste)
+1) Open PowerShell.
+2) Smoke test (30 minutes, live logs):
+```
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; cd $HOME; if (!(Test-Path Omega-FX-V3)) { git clone https://github.com/Cloudwith-mo/Omega-FX-V3.git }; cd Omega-FX-V3; .\scripts\gate_oneclick.ps1 -Phase smoke -Minutes 30 -TailLogs
+```
+3) When prompted, enter MT5_LOGIN, MT5_SERVER, MT5_PASSWORD (local only).
+4) Keep MT5 terminal open, logged in, Algo Trading enabled.
+5) If smoke passes, start the 5-day run:
+```
+cd $HOME\Omega-FX-V3; .\scripts\gate_oneclick.ps1 -Phase gate -TailLogs
+```
+6) Daily check:
+```
+cd $HOME\Omega-FX-V3; .\scripts\gate_daily_check.ps1
+```
+7) Simulate disconnect (3–5 minutes):
+```
+New-Item -ItemType File -Path $env:TEMP\ftmo_force_disconnect -Force
+Remove-Item $env:TEMP\ftmo_force_disconnect
+```
+8) If it crashes, show last logs:
+```
+Get-Content $HOME\Omega-FX-V3\runtime\service_crash.txt
+Get-Content $HOME\Omega-FX-V3\runtime\service.log -Tail 200
+```
+
 Run Streamlit HUD (reads runtime/status.json by default)
 - python -m pip install -e .[hud]
 - streamlit run apps/hud_streamlit.py
