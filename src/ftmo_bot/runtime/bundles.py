@@ -84,6 +84,7 @@ def generate_daily_bundle(
     copy_if_exists(safe_mode_path, "safe_mode.json")
     copy_if_exists(status_path, "status.json")
     copy_if_exists(state_snapshot_path, "state_snapshot.json")
+    copy_if_exists(Path("runtime") / "farm_status.json", "farm_status.json")
     if journal_path:
         copy_if_exists(journal_path, "journal.db")
     if drift_state_path:

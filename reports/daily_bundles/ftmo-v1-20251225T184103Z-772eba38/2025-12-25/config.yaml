@@ -1,0 +1,97 @@
+name: ftmo_v1
+version: "1.0"
+run_id_prefix: ftmo-v1
+instruments:
+  - EURUSD
+  - GBPUSD
+rule_spec:
+  account_size: 100000
+  max_daily_loss: 5000
+  max_total_loss: 10000
+  challenge_profit_target: 10000
+  verification_profit_target: 5000
+  min_trading_days: 4
+  timezone: Europe/Prague
+  daily_loss_stop_pct: 0.8
+  max_loss_stop_pct: 0.8
+  mtm_mode: worst_ohlc
+  fees:
+    EURUSD:
+      commission_usd_per_lot_round_trip: 7.0
+      swap_usd_per_lot_per_day: 0.0
+    GBPUSD:
+      commission_usd_per_lot_round_trip: 7.0
+      swap_usd_per_lot_per_day: 0.0
+  midnight_policy: buffer
+  midnight_window_minutes: 30
+  midnight_buffer_multiplier: 2.0
+  max_days_without_trade: 25
+  inactivity_warning_days: 5
+  drawdown_limit_pct: 0.07
+  drawdown_days_limit: 30
+  drawdown_warning_days: 5
+  stage: challenge
+  funded_mode: standard
+strategy:
+  name: mean_reversion_v1
+  parameters:
+    symbols: [EURUSD, GBPUSD]
+    timeframe: M15
+    trade_window_start: "12:00"
+    trade_window_end: "17:00"
+    bollinger_window: 20
+    bollinger_stddev: 2.0
+    rsi_period: 14
+    rsi_overbought: 70
+    rsi_oversold: 30
+    atr_period: 14
+    atr_multiplier: 1.5
+    take_profit_mode: mid_band
+    max_hold_bars: 16
+    max_positions_total: 2
+    max_positions_per_symbol: 1
+    max_trades_per_day: 4
+    max_entries_per_15min: 2
+    daily_loss_stop_pct: 0.01
+    risk_per_trade_pct: 0.0025
+    max_spread: 2.0
+    instruments:
+      EURUSD:
+        pip_size: 0.0001
+        pip_value_usd_per_lot: 10.0
+        min_lot: 0.01
+        lot_step: 0.01
+        max_lot: 5.0
+      GBPUSD:
+        pip_size: 0.0001
+        pip_value_usd_per_lot: 10.0
+        min_lot: 0.01
+        lot_step: 0.01
+        max_lot: 5.0
+execution:
+  broker: mt5
+  duplicate_window_seconds: 10
+  duplicate_block: true
+  throttle:
+    max_requests_per_day: 1500
+    max_modifications_per_minute: 30
+monitoring:
+  audit_log_path: runtime/audit.log
+runtime:
+  fast_loop_interval_seconds: 0.5
+  bar_loop_interval_seconds: 60
+  reconcile_interval_seconds: 30
+  health_check_interval_seconds: 10
+  status_interval_seconds: 5
+  status_path: runtime/status.json
+  state_snapshot_path: runtime/state_snapshot.json
+  safe_mode_path: runtime/safe_mode.json
+  daily_bundle_dir: reports/daily_bundles
+  daily_bundle_enabled: true
+  daily_metrics_path: runtime/daily_metrics.json
+  safe_mode_latched: true
+  drift_state_path: runtime/drift_state.json
+  drift_unresolved_seconds: 60
+gate:
+  min_pass_rate: 0.7
+  max_buffer_breach_runs: 0

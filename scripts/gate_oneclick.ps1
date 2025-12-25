@@ -1,5 +1,3 @@
-$ErrorActionPreference = "Stop"
-
 param(
   [ValidateSet("smoke", "gate")]
   [string]$Phase = "smoke",
@@ -10,8 +8,10 @@ param(
   [switch]$TailLogs
 )
 
+$ErrorActionPreference = "Stop"
+
 if (-not $RepoPath) {
-  $RepoPath = Join-Path $HOME "Omega-FX-V3"
+  $RepoPath = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 }
 
 if (-not (Test-Path $RepoPath)) {
@@ -69,7 +69,20 @@ if ($Phase -eq "smoke") {
     -PassThru
 
   Write-Host "Smoke running for $Minutes minutes (service PID $($proc.Id))..."
-  Start-Sleep -Seconds ($Minutes * 60)
+  $totalSeconds = [Math]::Max(0, $Minutes * 60)
+  for ($elapsed = 0; $elapsed -lt $totalSeconds; $elapsed++) {
+    if ($proc.HasExited) {
+      break
+    }
+    $remaining = $totalSeconds - $elapsed
+    $percent = if ($totalSeconds -gt 0) { [int](($elapsed / $totalSeconds) * 100) } else { 100 }
+    $eta = (Get-Date).AddSeconds($remaining)
+    $remainingText = [TimeSpan]::FromSeconds($remaining).ToString("mm':'ss")
+    $status = "{0}% ({1} remaining, ETA {2:HH:mm:ss})" -f $percent, $remainingText, $eta
+    Write-Progress -Activity "Smoke run" -Status $status -PercentComplete $percent
+    Start-Sleep -Seconds 1
+  }
+  Write-Progress -Activity "Smoke run" -Completed
 
   if (-not $proc.HasExited) {
     Stop-Process -Id $proc.Id -Force
@@ -78,13 +91,35 @@ if ($Phase -eq "smoke") {
     Stop-Process -Id $tailProc.Id -Force
   }
 
-  python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --last 1 --output-dir reports/bundle_summary
+  $runId = ""
+  if (Test-Path "runtime\run_state.json") {
+    $runId = (Get-Content "runtime\run_state.json" | ConvertFrom-Json).run_id
+  }
+  if ($runId) {
+    $runRoot = Join-Path "reports\daily_bundles" $runId
+    $dayDirs = @()
+    if (Test-Path $runRoot) {
+      $dayDirs = Get-ChildItem -Path $runRoot -Directory -ErrorAction SilentlyContinue
+    }
+    if (-not (Test-Path $runRoot) -or -not $dayDirs) {
+      python scripts\generate_daily_bundle.py --config $Config --run-id $runId --output-dir reports/daily_bundles | Out-Null
+    }
+  }
+  $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+  if ($runId) {
+    $summaryDir = Join-Path "reports\bundle_summary" "$runId-$stamp"
+    python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --run-id $runId --last 1 --output-dir $summaryDir
+  } else {
+    $summaryDir = Join-Path "reports\bundle_summary" $stamp
+    python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --last 1 --output-dir $summaryDir
+  }
 
-  $summaryPath = "reports\bundle_summary\summary.json"
+  $summaryPath = Join-Path $summaryDir "summary.json"
   if (-not (Test-Path $summaryPath)) {
     throw "summary.json missing: $summaryPath"
   }
   $summary = Get-Content $summaryPath | ConvertFrom-Json
+  Write-Host "summary_path:" $summaryPath
   Write-Host "run_id:" $summary.run_id
   Write-Host "go_no_go:" $summary.go_no_go
   Write-Host "passes_policy_1:" $summary.passes_policy_1
@@ -93,6 +128,7 @@ if ($Phase -eq "smoke") {
   Write-Host "breach_events:" $summary.totals.breach_events
   Write-Host "unresolved_drift_events:" $summary.totals.unresolved_drift_events
   Write-Host "duplicate_order_events:" $summary.totals.duplicate_order_events
+  Write-Host "safe_mode_unexpected_events:" $summary.totals.safe_mode_unexpected_events
 
   if (Test-Path "runtime\service_crash.txt") {
     Write-Warning "Crash marker:"
@@ -118,5 +154,6 @@ Write-Host "run_id:" $runId
 Write-Host "bundles: reports\daily_bundles\$runId\YYYY-MM-DD\"
 Write-Host "daily check: scripts\gate_daily_check.ps1"
 Write-Host "end-of-run summary:"
-Write-Host "python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --run-id $runId --last 5 --output-dir reports/bundle_summary"
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+Write-Host "python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --run-id $runId --last 5 --output-dir reports/bundle_summary\\$runId-$stamp"
 Write-Host "Logs: runtime\service.log (crash marker: runtime\service_crash.txt)"

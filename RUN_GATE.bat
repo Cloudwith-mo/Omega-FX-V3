@@ -1,0 +1,8 @@
+@echo off
+setlocal
+cd /d "%~dp0"
+
+set "REPO=%~dp0"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $repo = (Resolve-Path '%REPO%').Path; Set-Location $repo; if (Test-Path '.\.venv\Scripts\Activate.ps1') { . '.\.venv\Scripts\Activate.ps1' }; $env:PYTHONPATH='src'; $config = Join-Path $repo 'configs\ftmo_v1.mt5.yaml'; if (-not (Test-Path $config)) { throw ('Config not found: ' + $config) }; $settingsDir = Join-Path $env:APPDATA 'Omega-FX-V3'; $settingsPath = Join-Path $settingsDir 'mt5_settings.json'; $settings = @{}; if (Test-Path $settingsPath) { try { $settings = (Get-Content $settingsPath -Raw | ConvertFrom-Json) } catch { $settings = @{} } }; if (-not $env:MT5_LOGIN -and $settings.login) { $env:MT5_LOGIN = $settings.login }; if (-not $env:MT5_SERVER -and $settings.server) { $env:MT5_SERVER = $settings.server }; if (-not $env:MT5_LOGIN) { $env:MT5_LOGIN = Read-Host 'MT5_LOGIN' }; if (-not $env:MT5_SERVER) { $env:MT5_SERVER = Read-Host 'MT5_SERVER' }; if (-not (Test-Path $settingsDir)) { New-Item -ItemType Directory -Force -Path $settingsDir | Out-Null }; @{ login = $env:MT5_LOGIN; server = $env:MT5_SERVER } | ConvertTo-Json | Set-Content -Encoding UTF8 $settingsPath; $secretPath = Join-Path $settingsDir 'mt5_password.xml'; if (-not $env:MT5_PASSWORD) { if (Test-Path $secretPath) { $secure = Import-Clixml $secretPath } else { $secure = Read-Host 'MT5_PASSWORD' -AsSecureString; $secure | Export-Clixml $secretPath }; $env:MT5_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)) }; .\scripts\gate_oneclick.ps1 -Phase gate -RepoPath $repo -Config $config }"
+
+pause

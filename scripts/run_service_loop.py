@@ -12,11 +12,12 @@ from zoneinfo import ZoneInfo
 from ftmo_bot.config import compute_config_hash, freeze_config, load_config, verify_config_lock
 from ftmo_bot.execution import ExecutionEngine, MT5Broker, OrderJournal, PaperBroker, RequestThrottle
 from ftmo_bot.execution.broker import BrokerAdapter
-from ftmo_bot.execution.models import BrokerOrder, Position
+from ftmo_bot.execution.models import BrokerOrder, ExecutionOrder, Position
 from dataclasses import asdict
 
 from ftmo_bot.monitoring import AuditLog, LogNotifier, Monitor, build_runtime_status
-from ftmo_bot.strategy import fetch_symbol_specs
+from ftmo_bot.strategy import StrategyContext, StrategyFarm, fetch_symbol_specs
+from ftmo_bot.strategy.market_data import MT5BarFeed
 from ftmo_bot.risk import RiskGovernor
 from ftmo_bot.rule_engine import RuleEngine
 from ftmo_bot.rule_engine.models import RuleState
@@ -206,6 +207,23 @@ def main() -> None:
             {symbol: asdict(spec) for symbol, spec in symbol_specs.items()},
         )
 
+    farm = None
+    bar_feed = None
+    farm_status_path = Path("runtime") / "farm_status.json"
+    if config.farm.enabled:
+        if config.execution.broker != "mt5":
+            audit.log("farm_disabled", {"reason": "farm requires mt5 broker"})
+        else:
+            context = StrategyContext(
+                timezone=config.rule_spec.timezone,
+                initial_balance=config.rule_spec.account_size,
+                symbol_specs=symbol_specs or None,
+            )
+            farm = StrategyFarm(config.farm, config.rule_spec, context, baseline_strategy=config.strategy)
+            farm_params = (config.farm.strategies[0].parameters if config.farm.strategies else config.strategy.parameters)
+            farm_timeframe = str(farm_params.get("timeframe", "M15"))
+            bar_feed = MT5BarFeed(config.instruments, farm_timeframe, config.rule_spec.timezone)
+
     status_path = Path(config.runtime.status_path)
     state_snapshot_path = Path(config.runtime.state_snapshot_path)
     daily_bundle_dir = Path(config.runtime.daily_bundle_dir)
@@ -348,6 +366,38 @@ def main() -> None:
     async def bar_loop() -> None:
         if safe_mode.state.enabled:
             return
+        if farm is None or bar_feed is None:
+            return
+
+        def execution_side(intent) -> str:
+            if intent.reduce_only:
+                return "sell" if intent.side == "buy" else "buy"
+            return intent.side
+
+        for bar in bar_feed.fetch_new_bars():
+            intents_by_strategy = farm.process_bar(bar)
+            leader_id = farm.leader_id
+            if leader_id and leader_id in intents_by_strategy:
+                for intent in intents_by_strategy[leader_id]:
+                    if state_cache is None:
+                        continue
+                    decision = governor.pre_trade(intent, state_cache)
+                    if not decision.allow:
+                        continue
+                    order = ExecutionOrder(
+                        client_order_id=intent.intent_id,
+                        symbol=intent.symbol,
+                        side=execution_side(intent),
+                        volume=float(intent.volume),
+                        time=bar.time,
+                        intent_id=intent.intent_id,
+                        strategy_id=intent.strategy_id,
+                    )
+                    engine.place_order(order)
+
+            snapshot = farm.snapshot(bar.time)
+            farm_status_path.parent.mkdir(parents=True, exist_ok=True)
+            farm_status_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
 
     drift_tracker = DriftTracker(
         drift_state_path,

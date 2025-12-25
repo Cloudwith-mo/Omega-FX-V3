@@ -51,5 +51,6 @@ Write-Host "run_id:" $runId
 Write-Host "bundles: reports\daily_bundles\$runId\YYYY-MM-DD\"
 Write-Host "daily check: scripts\gate_daily_check.ps1"
 Write-Host "end-of-run summary:"
-Write-Host "python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --run-id $runId --last 5 --output-dir reports/bundle_summary"
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+Write-Host "python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --run-id $runId --last 5 --output-dir reports/bundle_summary\\$runId-$stamp"
 Write-Host "Logs: runtime\service.log (crash marker: runtime\service_crash.txt)"

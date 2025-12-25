@@ -1,0 +1,5 @@
+{
+  "enabled": true,
+  "reason": "reconcile loop error: SQLite objects created in a thread can only be used in that same thread. The object was created in thread id 16088 and this is thread id 10816.",
+  "since": "2025-12-24T23:14:25.465242+00:00"
+}

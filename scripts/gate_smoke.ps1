@@ -49,9 +49,30 @@ if (-not $proc.HasExited) {
   $stopped = $true
 }
 
-python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --last 1 --output-dir reports/bundle_summary
+$runId = ""
+if (Test-Path "runtime\run_state.json") {
+  $runId = (Get-Content "runtime\run_state.json" | ConvertFrom-Json).run_id
+}
+if ($runId) {
+  $runRoot = Join-Path "reports\daily_bundles" $runId
+  $dayDirs = @()
+  if (Test-Path $runRoot) {
+    $dayDirs = Get-ChildItem -Path $runRoot -Directory -ErrorAction SilentlyContinue
+  }
+  if (-not (Test-Path $runRoot) -or -not $dayDirs) {
+    python scripts\generate_daily_bundle.py --config $Config --run-id $runId --output-dir reports/daily_bundles | Out-Null
+  }
+}
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+if ($runId) {
+  $summaryDir = Join-Path "reports\bundle_summary" "$runId-$stamp"
+  python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --run-id $runId --last 1 --output-dir $summaryDir
+} else {
+  $summaryDir = Join-Path "reports\bundle_summary" $stamp
+  python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --last 1 --output-dir $summaryDir
+}
 
-$summaryPath = "reports\bundle_summary\summary.json"
+$summaryPath = Join-Path $summaryDir "summary.json"
 if (-not (Test-Path $summaryPath)) {
   throw "summary.json missing: $summaryPath"
 }
@@ -65,6 +86,7 @@ Write-Host "daily_buffer_stop_count:" $summary.totals.daily_buffer_stop_count
 Write-Host "breach_events:" $summary.totals.breach_events
 Write-Host "unresolved_drift_events:" $summary.totals.unresolved_drift_events
 Write-Host "duplicate_order_events:" $summary.totals.duplicate_order_events
+Write-Host "safe_mode_unexpected_events:" $summary.totals.safe_mode_unexpected_events
 
 if (-not $stopped -and $proc.HasExited) {
   Write-Warning "Service exited early. Last 200 log lines:"

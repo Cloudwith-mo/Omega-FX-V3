@@ -15,6 +15,23 @@ class StrategyConfig:
 
 
 @dataclass(frozen=True)
+class FarmConfig:
+    enabled: bool = False
+    mode: str = "shadow"
+    leader_margin: float = 0.0
+    leader_min_days: int = 1
+    score_window_days: int = 5
+    score_window_trades: int = 0
+    drawdown_penalty: float = 1.0
+    buffer_stop_penalty: float = 1.0
+    burst_penalty: float = 1.0
+    demotion_buffer_stops: int = 2
+    demotion_window_days: int = 5
+    bench_days: int = 3
+    strategies: list[StrategyConfig] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class ExecutionConfig:
     broker: str
     account: Optional[str] = None
@@ -64,3 +81,4 @@ class BotConfig:
     monitoring: MonitoringConfig
     gate: GateConfig = GateConfig()
     runtime: RuntimeConfig = RuntimeConfig()
+    farm: FarmConfig = FarmConfig()

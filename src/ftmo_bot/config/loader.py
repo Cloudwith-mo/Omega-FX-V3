@@ -14,6 +14,7 @@ import yaml
 from ftmo_bot.config.models import (
     BotConfig,
     ExecutionConfig,
+    FarmConfig,
     GateConfig,
     MonitoringConfig,
     RuntimeConfig,
@@ -37,6 +38,7 @@ def load_config(path: str | Path) -> BotConfig:
     monitoring = _parse_monitoring(data.get("monitoring", {}))
     gate = _parse_gate(data.get("gate", {}))
     runtime = _parse_runtime(data.get("runtime", {}))
+    farm = _parse_farm(data.get("farm", {}))
 
     return BotConfig(
         name=name,
@@ -49,6 +51,7 @@ def load_config(path: str | Path) -> BotConfig:
         monitoring=monitoring,
         gate=gate,
         runtime=runtime,
+        farm=farm,
     )
 
 
@@ -150,6 +153,35 @@ def _parse_strategy(data: dict[str, Any]) -> StrategyConfig:
     return StrategyConfig(
         name=str(_require(data, "name")),
         parameters=dict(data.get("parameters", {})),
+    )
+
+
+def _parse_farm(data: dict[str, Any]) -> FarmConfig:
+    strategies: list[StrategyConfig] = []
+    for payload in data.get("strategies", []) or []:
+        if not isinstance(payload, dict):
+            continue
+        strategies.append(
+            StrategyConfig(
+                name=str(_require(payload, "name")),
+                parameters=dict(payload.get("parameters", {})),
+            )
+        )
+
+    return FarmConfig(
+        enabled=bool(data.get("enabled", False)),
+        mode=str(data.get("mode", "shadow")),
+        leader_margin=float(data.get("leader_margin", 0.0)),
+        leader_min_days=int(data.get("leader_min_days", 1)),
+        score_window_days=int(data.get("score_window_days", 5)),
+        score_window_trades=int(data.get("score_window_trades", 0)),
+        drawdown_penalty=float(data.get("drawdown_penalty", 1.0)),
+        buffer_stop_penalty=float(data.get("buffer_stop_penalty", 1.0)),
+        burst_penalty=float(data.get("burst_penalty", 1.0)),
+        demotion_buffer_stops=int(data.get("demotion_buffer_stops", 2)),
+        demotion_window_days=int(data.get("demotion_window_days", 5)),
+        bench_days=int(data.get("bench_days", 3)),
+        strategies=strategies,
     )
 
 

@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: ftmo-bot
+Version: 0.1.0
+Summary: Rules-first FTMO bot
+Requires-Python: >=3.11
+Requires-Dist: PyYAML>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Provides-Extra: hud
+Requires-Dist: streamlit>=1.30; extra == "hud"

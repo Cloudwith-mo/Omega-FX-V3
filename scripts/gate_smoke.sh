@@ -43,12 +43,23 @@ if [[ -z "$RUN_ID" ]]; then
   exit 1
 fi
 
-python3 scripts/analyze_bundles.py --bundle-root reports/daily_bundles --run-id "$RUN_ID" --last 1 --output-dir reports/bundle_summary
+if [[ ! -d "reports/daily_bundles/${RUN_ID}" ]]; then
+  PYTHONPATH=src python3 scripts/generate_daily_bundle.py --config configs/ftmo_v1.yaml --run-id "$RUN_ID" --output-dir reports/daily_bundles
+else
+  if ! find "reports/daily_bundles/${RUN_ID}" -mindepth 1 -maxdepth 1 -type d | grep -q .; then
+    PYTHONPATH=src python3 scripts/generate_daily_bundle.py --config configs/ftmo_v1.yaml --run-id "$RUN_ID" --output-dir reports/daily_bundles
+  fi
+fi
 
-python3 - <<'PY'
+STAMP="$(date +%Y%m%d-%H%M%S)"
+SUMMARY_DIR="reports/bundle_summary/${RUN_ID}-${STAMP}"
+python3 scripts/analyze_bundles.py --bundle-root reports/daily_bundles --run-id "$RUN_ID" --last 1 --output-dir "$SUMMARY_DIR"
+
+SUMMARY_DIR="$SUMMARY_DIR" python3 - <<'PY'
 import json
+import os
 from pathlib import Path
-summary = Path("reports/bundle_summary/summary.json")
+summary = Path(os.environ["SUMMARY_DIR"]) / "summary.json"
 if not summary.exists():
     raise SystemExit("summary.json missing")
 payload = json.loads(summary.read_text())
@@ -61,6 +72,7 @@ print("daily_buffer_stop_count:", totals.get("daily_buffer_stop_count"))
 print("breach_events:", totals.get("breach_events"))
 print("unresolved_drift_events:", totals.get("unresolved_drift_events"))
 print("duplicate_order_events:", totals.get("duplicate_order_events"))
+print("safe_mode_unexpected_events:", totals.get("safe_mode_unexpected_events"))
 print("min_daily_headroom:", totals.get("min_daily_headroom"))
 print("min_max_headroom:", totals.get("min_max_headroom"))
 print("total_trades:", totals.get("total_trades"))

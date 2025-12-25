@@ -5,12 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
-from typing import Optional
 
 from ftmo_bot.rule_engine.models import OrderIntent
 from ftmo_bot.execution.models import SymbolSpec
 from ftmo_bot.rule_engine.time import trading_day_for
 from ftmo_bot.simulator.models import PriceBar, Signal
+from ftmo_bot.strategy.base import TradingStrategy
+from ftmo_bot.strategy.indicators import IndicatorSeries
 from ftmo_bot.strategy.models import PositionState, StrategyDecision, StrategyState
 from ftmo_bot.strategy.sizer import Sizer
 from ftmo_bot.strategy.models import SizerConfig
@@ -30,6 +31,8 @@ class MeanReversionParams:
     rsi_oversold: float = 30.0
     atr_period: int = 14
     atr_multiplier: float = 1.5
+    adx_period: int = 14
+    adx_disable_threshold: float = 0.0
     take_profit_mode: str = "mid_band"
     max_hold_bars: int = 0
     max_positions_total: int = 2
@@ -58,6 +61,8 @@ class MeanReversionParams:
             rsi_oversold=float(data.get("rsi_oversold", 30.0)),
             atr_period=int(data.get("atr_period", 14)),
             atr_multiplier=float(data.get("atr_multiplier", 1.5)),
+            adx_period=int(data.get("adx_period", 14)),
+            adx_disable_threshold=float(data.get("adx_disable_threshold", 0.0)),
             take_profit_mode=str(data.get("take_profit_mode", "mid_band")),
             max_hold_bars=int(data.get("max_hold_bars", 0)),
             max_positions_total=int(data.get("max_positions_total", 2)),
@@ -68,74 +73,7 @@ class MeanReversionParams:
         )
 
 
-class IndicatorSeries:
-    def __init__(self) -> None:
-        self.times: list[datetime] = []
-        self.closes: list[float] = []
-        self.highs: list[float] = []
-        self.lows: list[float] = []
-
-    def update(self, bar: PriceBar) -> None:
-        close = (bar.bid + bar.ask) / 2.0
-        high = bar.high if bar.high is not None else max(bar.bid, bar.ask)
-        low = bar.low if bar.low is not None else min(bar.bid, bar.ask)
-        self.times.append(bar.time)
-        self.closes.append(close)
-        self.highs.append(high)
-        self.lows.append(low)
-
-    def sma(self, window: int) -> Optional[float]:
-        if len(self.closes) < window:
-            return None
-        slice_ = self.closes[-window:]
-        return sum(slice_) / window
-
-    def stddev(self, window: int) -> Optional[float]:
-        if len(self.closes) < window:
-            return None
-        slice_ = self.closes[-window:]
-        mean = sum(slice_) / window
-        variance = sum((value - mean) ** 2 for value in slice_) / window
-        return variance**0.5
-
-    def bollinger(self, window: int, stddevs: float) -> Optional[tuple[float, float, float]]:
-        mean = self.sma(window)
-        deviation = self.stddev(window)
-        if mean is None or deviation is None:
-            return None
-        upper = mean + stddevs * deviation
-        lower = mean - stddevs * deviation
-        return mean, upper, lower
-
-    def rsi(self, period: int) -> Optional[float]:
-        if len(self.closes) < period + 1:
-            return None
-        deltas = [
-            self.closes[i] - self.closes[i - 1]
-            for i in range(len(self.closes) - period, len(self.closes))
-        ]
-        gains = sum(delta for delta in deltas if delta > 0)
-        losses = -sum(delta for delta in deltas if delta < 0)
-        if gains == 0 and losses == 0:
-            return 50.0
-        if losses == 0:
-            return 100.0
-        rs = gains / losses
-        return 100.0 - (100.0 / (1.0 + rs))
-
-    def atr(self, period: int) -> Optional[float]:
-        if len(self.closes) < period + 1:
-            return None
-        true_ranges = []
-        for index in range(len(self.closes) - period, len(self.closes)):
-            high = self.highs[index]
-            low = self.lows[index]
-            prev_close = self.closes[index - 1]
-            true_ranges.append(max(high - low, abs(high - prev_close), abs(low - prev_close)))
-        return sum(true_ranges) / period
-
-
-class MeanReversionStrategy:
+class MeanReversionStrategy(TradingStrategy):
     def __init__(
         self,
         params: MeanReversionParams,
@@ -143,12 +81,31 @@ class MeanReversionStrategy:
         timezone: str,
         initial_balance: float,
     ) -> None:
+        self.strategy_id = "mean_reversion_v1"
         self.params = params
         self.sizer = sizer
         self.timezone = timezone
         self.initial_balance = initial_balance
         self.state = StrategyState()
         self.series: dict[str, IndicatorSeries] = {symbol: IndicatorSeries() for symbol in params.symbols}
+        self._pending_decisions: list[StrategyDecision] = []
+
+    def initialize(self, config: dict, context) -> None:
+        return None
+
+    def on_market_data(self, bar: PriceBar) -> None:
+        self._pending_decisions = self.on_bar(bar)
+
+    def generate_intents(self) -> list[OrderIntent]:
+        intents = [decision.order_intent for decision in self._pending_decisions if decision.order_intent]
+        self._pending_decisions = []
+        return intents
+
+    def get_state(self) -> dict:
+        return {
+            "strategy_id": self.strategy_id,
+            "open_positions": len(self.state.positions),
+        }
 
     @staticmethod
     def _in_window(now: datetime, start: time, end: time, timezone: str) -> bool:
@@ -174,6 +131,8 @@ class MeanReversionStrategy:
             time=now,
             estimated_risk=0.0,
             reduce_only=True,
+            strategy_id=self.strategy_id,
+            risk_in_account_ccy=0.0,
         )
         return StrategyDecision(signal=signal, order_intent=intent, reason="Exit")
 
@@ -189,6 +148,9 @@ class MeanReversionStrategy:
         bands = series.bollinger(self.params.bollinger_window, self.params.bollinger_stddev)
         rsi_value = series.rsi(self.params.rsi_period)
         atr_value = series.atr(self.params.atr_period)
+        adx_value = None
+        if self.params.adx_disable_threshold and self.params.adx_disable_threshold > 0:
+            adx_value = series.adx(self.params.adx_period)
         if bands is None or rsi_value is None or atr_value is None:
             return decisions
         mid_band, upper_band, lower_band = bands
@@ -241,6 +203,12 @@ class MeanReversionStrategy:
         if self.state.trades_today(day) >= self.params.max_trades_per_day:
             return decisions
         if self.state.entries_in_last_minutes(now, 15) >= self.params.max_entries_per_15min:
+            return decisions
+        if (
+            adx_value is not None
+            and self.params.adx_disable_threshold
+            and adx_value >= self.params.adx_disable_threshold
+        ):
             return decisions
 
         close_price = (bar.bid + bar.ask) / 2.0
@@ -296,7 +264,8 @@ class MeanReversionStrategy:
             estimated_risk=size_result.estimated_risk,
             stop_price=stop_price,
             take_profit=target_price,
-            strategy_id="mean_reversion_v1",
+            strategy_id=self.strategy_id,
+            risk_in_account_ccy=size_result.estimated_risk,
         )
         decisions.append(StrategyDecision(signal=signal, order_intent=intent, reason="Entry"))
         return decisions

@@ -119,6 +119,9 @@ class OrderIntent:
     stop_price: Optional[float] = None
     take_profit: Optional[float] = None
     strategy_id: Optional[str] = None
+    order_type: str = "market"
+    confidence: Optional[float] = None
+    risk_in_account_ccy: Optional[float] = None
     intent_id: str = field(default_factory=lambda: uuid4().hex)
 
 

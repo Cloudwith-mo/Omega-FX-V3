@@ -10,6 +10,7 @@ from ftmo_bot.config.loader import (
 from ftmo_bot.config.models import (
     BotConfig,
     ExecutionConfig,
+    FarmConfig,
     GateConfig,
     MonitoringConfig,
     RuntimeConfig,
@@ -19,6 +20,7 @@ from ftmo_bot.config.models import (
 __all__ = [
     "BotConfig",
     "ExecutionConfig",
+    "FarmConfig",
     "GateConfig",
     "MonitoringConfig",
     "RuntimeConfig",

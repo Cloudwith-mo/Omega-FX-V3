@@ -124,6 +124,7 @@ class DaySummary:
     unresolved_drift_events: int
     duplicate_order_events: int
     safe_mode_events: list[dict[str, str]]
+    safe_mode_unexpected_events: list[dict[str, str]]
     restart_events: int
     reconnect_events: int
     disconnect_events: int
@@ -201,11 +202,13 @@ def main() -> None:
         unresolved_drift_events = 0
         duplicate_order_events = 0
         safe_mode_events = []
+        safe_mode_unexpected_events = []
         restart_events = 0
         reconnect_events = 0
         disconnect_events = 0
         buffer_breaches = 0
         hard_limit_breaches = 0
+        disconnect_simulated_active = False
 
         order_times: list[datetime] = []
         modify_times: list[datetime] = []
@@ -216,6 +219,10 @@ def main() -> None:
             payload = event.get("payload") or {}
             ts = _parse_ts(event.get("ts", ""))
 
+            if event_name == "disconnect_simulated":
+                disconnect_simulated_active = True
+            if event_name == "disconnect_simulated_clear":
+                disconnect_simulated_active = False
             if event_name == "run_start":
                 restart_events += 1
             if event_name == "reconnect":
@@ -224,7 +231,14 @@ def main() -> None:
                 disconnect_events += 1
             if event_name == "safe_mode":
                 if payload.get("enabled"):
-                    safe_mode_events.append({"reason": payload.get("reason", "")})
+                    reason_text = str(payload.get("reason", ""))
+                    safe_mode_events.append({"reason": reason_text})
+                    expected = (
+                        disconnect_simulated_active
+                        and "broker connection lost" in reason_text.lower()
+                    )
+                    if not expected:
+                        safe_mode_unexpected_events.append({"reason": reason_text})
             if event_name == "daily_buffer_stop":
                 daily_buffer_stops.append(payload)
             if event_name == "rule_violation":
@@ -275,6 +289,7 @@ def main() -> None:
                 unresolved_drift_events=unresolved_drift_events,
                 duplicate_order_events=duplicate_order_events,
                 safe_mode_events=safe_mode_events,
+                safe_mode_unexpected_events=safe_mode_unexpected_events,
                 restart_events=restart_events,
                 reconnect_events=reconnect_events,
                 disconnect_events=disconnect_events,
@@ -305,6 +320,7 @@ def main() -> None:
         default=None,
     )
     total_safe_modes = sum(len(day.safe_mode_events) for day in summaries)
+    total_safe_mode_unexpected = sum(len(day.safe_mode_unexpected_events) for day in summaries)
     total_restarts = sum(day.restart_events for day in summaries)
     total_reconnects = sum(day.reconnect_events for day in summaries)
     total_disconnects = sum(day.disconnect_events for day in summaries)
@@ -319,6 +335,7 @@ def main() -> None:
         total_breaches == 0
         and total_drift_unresolved == 0
         and total_duplicates == 0
+        and total_safe_mode_unexpected == 0
         and stable_frequency_all
     )
     go_no_go = "GO" if pass_daily_buffer_policy and passes_policy_2 else "NO_GO"
@@ -342,6 +359,7 @@ def main() -> None:
             "unresolved_drift_events": total_drift_unresolved,
             "duplicate_order_events": total_duplicates,
             "safe_mode_events": total_safe_modes,
+            "safe_mode_unexpected_events": total_safe_mode_unexpected,
             "restart_events": total_restarts,
             "reconnect_events": total_reconnects,
             "disconnect_events": total_disconnects,
@@ -360,7 +378,7 @@ def main() -> None:
 
     table_lines = [
         "day,trades,min_daily_headroom,min_max_headroom,max_intraday_drawdown_pct,max_overall_drawdown_pct,"
-        "buffer_stops,breaches,drift_unresolved,duplicates,restarts,reconnects,disconnections,"
+        "buffer_stops,breaches,drift_unresolved,duplicates,safe_mode_unexpected,restarts,reconnects,disconnections,"
         "max_entries_15m,max_modifications_1m,stable_frequency",
     ]
     for day in summaries:
@@ -368,11 +386,17 @@ def main() -> None:
             f"{day.day},{day.trades},{day.min_daily_headroom},{day.min_max_headroom},"
             f"{day.max_intraday_drawdown_pct},{day.max_drawdown_pct},{len(day.daily_buffer_stops)},"
             f"{day.breach_events},{day.unresolved_drift_events},{day.duplicate_order_events},"
+            f"{len(day.safe_mode_unexpected_events)},"
             f"{day.restart_events},{day.reconnect_events},{day.disconnect_events},"
             f"{day.max_entries_15m},{day.max_modifications_1m},{day.stable_frequency}"
         )
     table_path = output_dir / "summary_table.csv"
-    table_path.write_text("\n".join(table_lines), encoding="utf-8")
+    try:
+        table_path.write_text("\n".join(table_lines), encoding="utf-8")
+    except OSError:
+        stamped = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        table_path = output_dir / f"summary_table_{stamped}.csv"
+        table_path.write_text("\n".join(table_lines), encoding="utf-8")
 
     print(f"Summary written to {summary_path}")
     print(f"Table written to {table_path}")

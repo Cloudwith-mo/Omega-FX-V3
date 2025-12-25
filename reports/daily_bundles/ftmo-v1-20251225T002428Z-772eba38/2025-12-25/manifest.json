@@ -1,0 +1,12 @@
+{
+  "config.yaml": "configs\\ftmo_v1.mt5.yaml",
+  "config.lock.json": "configs\\ftmo_v1.mt5.yaml.lock.json",
+  "run_state.json": "runtime\\run_state.json",
+  "safe_mode.json": "runtime\\safe_mode.json",
+  "status.json": "runtime\\status.json",
+  "state_snapshot.json": "runtime\\state_snapshot.json",
+  "journal.db": "runtime\\journal-ftmo-v1-20251225T002428Z-772eba38.db",
+  "daily_metrics.json": "runtime\\daily_metrics.json",
+  "daily_metrics_day.json": "runtime\\daily_metrics.json#2025-12-25",
+  "audit.log": "runtime\\audit.log (999 lines)"
+}

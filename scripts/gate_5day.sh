@@ -43,4 +43,5 @@ echo "$RUN_ID" > runtime/gate_run_id.txt
 echo "run_id: $RUN_ID"
 echo "bundles: reports/daily_bundles/$RUN_ID/YYYY-MM-DD/"
 echo "end-of-run summary command:"
-echo "python3 scripts/analyze_bundles.py --bundle-root reports/daily_bundles --run-id $RUN_ID --last 5 --output-dir reports/bundle_summary"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+echo "python3 scripts/analyze_bundles.py --bundle-root reports/daily_bundles --run-id $RUN_ID --last 5 --output-dir reports/bundle_summary/${RUN_ID}-${STAMP}"

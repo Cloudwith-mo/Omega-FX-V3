@@ -9,9 +9,20 @@ if (-not (Test-Path ".venv")) {
 . .\.venv\Scripts\Activate.ps1
 $env:PYTHONPATH = "src"
 
-python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --last 1 --output-dir reports/bundle_summary
+$runId = ""
+if (Test-Path "runtime\run_state.json") {
+  $runId = (Get-Content "runtime\run_state.json" | ConvertFrom-Json).run_id
+}
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+if ($runId) {
+  $summaryDir = Join-Path "reports\bundle_summary" "$runId-$stamp"
+  python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --run-id $runId --last 1 --output-dir $summaryDir
+} else {
+  $summaryDir = Join-Path "reports\bundle_summary" $stamp
+  python scripts\analyze_bundles.py --bundle-root reports/daily_bundles --last 1 --output-dir $summaryDir
+}
 
-$summaryPath = "reports\bundle_summary\summary.json"
+$summaryPath = Join-Path $summaryDir "summary.json"
 if (-not (Test-Path $summaryPath)) {
   throw "summary.json missing: $summaryPath"
 }
@@ -25,6 +36,7 @@ Write-Host "daily_buffer_stop_count:" $summary.totals.daily_buffer_stop_count
 Write-Host "breach_events:" $summary.totals.breach_events
 Write-Host "unresolved_drift_events:" $summary.totals.unresolved_drift_events
 Write-Host "duplicate_order_events:" $summary.totals.duplicate_order_events
+Write-Host "safe_mode_unexpected_events:" $summary.totals.safe_mode_unexpected_events
 Write-Host "min_daily_headroom:" $summary.totals.min_daily_headroom
 Write-Host "min_max_headroom:" $summary.totals.min_max_headroom
 Write-Host "total_trades:" $summary.totals.total_trades
